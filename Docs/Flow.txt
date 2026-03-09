@@ -1,0 +1,51 @@
+CAMPUS-IQ:
+We are creating a project a centralised system for college where we are automating the whole college system in which we can upload data of various departments there will a monitoring of this data, verification and based on it we providing insights, trends, and visualization, we will also provide option to transform and download the data into useful format such as excel and pdf for further institution purpose.
+It includes multiple entities such as college students and teacher of different Branch, Branch coordinator, Branch Hod, Internal quality assurance cell (IQAC), dean planning and development, principal, college management each role has different access-control and based on roles they can access data for which they are permitted, they can't access or modify data beyond their access limit.
+We are digitalizing all record work, with verification, constraints, deadlines and we also provide options to generate specific report analytics such as for annual audit, NAAC, NBA or university work this system is designed for whole college, Each role has different privileges and access levels And data flow. I will tell you the data flow of the project wait for it and make sure to remember each as every point, As for now we are only covering research and development (R&D) department and later on we will cover all other remaining departments and finally then combine it. 
+
+
+
+
+
+Entities: 1)Students (Branch wise many) 
+	  2)Faculties (Teaching and Non-teaching can be branch wise many or overall)
+	  3)Branch Coordinator (It is faculty but assigned by branch HOD or R&D incharge with task of R&D data verification, collection and management, it can be many branch wise and have access limited to its own branch but can add group member from another)
+	  4)Branch HOD (Branch wise only one for whole Branch but can have assistants)
+	  5)R&D incharge (only one for whole college but can have assistants)
+	  6)Dean planning and development [P&D] (only one for whole college but can have assistants)
+	  7)IQAC incharge (only one for whole college but can have assistants)
+	  8)Principal and Vice-principal (only one for whole college but can have assistants)
+	  9)College Management(Can be multiple)
+	  10)Super admin(The developer who will control the whole college)
+Wait for more, i will send you more data regarding Data Flow.
+
+
+
+
+Data Flow: 
+1)Student: they can only view their own data and have one to many relations, For example a student can have one project, or group of student working on one project and publishing papers, so in group even if one member enters data it will appear on all members profiles and no duplicate entries can be done, student can also see the limited data of R&D of all students faculty search and view them on dashboard. student will have different branches, year, section and they have college unique UGF id which specify  their branch, year and unique number. Student can view their own data and also can check the status of submissions. 
+
+2)Faculty: they can view and add their own data as well as students data. They can have one to many relations and can have undefined entities, For example a teacher can have one project, or group of teachers working on one project and publishing papers, so in group even if one member enters data it will appear on all members profiles and no duplicate entries can be done teacher can be null as some contributors may belong to other college, teacher can also see the limited data of R&D of all students faculty search and view them on dashboard. Teacher  can be a class teacher of specific branch year. They can add and delete students but it requires email verification before proceeding. They can also check the submission status of own submission as well as student submission. Faculty are classified into 3 types Class teacher, Branch coordinator, General faculty.
+	a) Class teacher (CT): They can only add students and register new students of there own class.
+	b) Branch Coordinator (BC): They can add R&D data of faculty and students. Also they can verify.
+	c) General Teacher (GT): Faculty which does not have assigned special role
+
+3)Branch coordinator: It is normal faculty and have all privileges of faculty, they are assigned by branch HODs for verification and entry of data of R&D which will be further goes for second verification process by R&D incharge, so in Database their will be verification column for each table data entered by coordinator(Approve/Reject). they can either approve or reject with remark. if approved it will further goes for second verification process by R&D incharge and if reject then goes back with remark and shown in status.
+
+4)Branch HOD: Branch HOD can assign Branch coordinator, HOD can also add faculties and assign their roles such as CT,BC,GT. HOD can also remove faculties, students of their own department.  They can send emails and notification to the faculties about the deadlines and updates of assigned tasks or activities. They can view and monitor all this process at their own department level, if deadline exceeds HOD can give warnings and can disable(close) the data entry or record uploading portal. There are following departements in our college: a)Applied Science and Humanities (1st year department for all engineering branches) b) Computer Science and Engineering , c) CSE (AIML) d) Electronics and Telecommunication Engineering e)Electric Engineering f) Mechanical Engineering g)Electronics and computer engineering h)Advanced Communication Technology i) AI and DS j) MBA . HOD can download autogenerated reports, view stats, download custom records data from database in excel format, there will be E-Signature which shows who generated this data/report "like generated by HOD"
+
+5)R&D incharge: It will be at highest level of verification process, it will finally approve or reject the entry with remark and they can all the data of all the branches. It decide goals and deadlines of the RND department, the system must be adaptive as per the deadlines, portal will close as the deadline exceeds, they can create custom reports and generate custom excel based on database and selected columns, they can view, generate stats and reports. They can send emails and nofications for Faculties and HODs about the goals and deadlines with remark. they can view whole process in dashboard.can give warnings and can disable(close) the data entry or record uploading portal.
+
+6)Dean planning and development: They can only view stats and reports in dashboard, generate and download custom excel as per requirements. can give target and goals to RND department.They can also send emails and nofications for Faculties and HODs about the goals and deadlines with remark. can give warnings and can disable(close) the data entry or record uploading portal.
+
+7)IQAC incharge: They can only view stats and reports in dashboard, generate and download custom excel as per requirements. can give target and goals to RND department.They can also send emails and nofications for Faculties and HODs about the goals and deadlines with remark. can give warnings and can disable(close) the data entry or record uploading portal.
+
+8)Principal and Vice-principal: They can only view stats and reports in dashboard, generate and download custom excel as per requirements. can give target and goals to RND department.They can also send emails and nofications for Faculties and HODs about the goals and deadlines with remark. can give warnings and can disable(close) the data entry or record uploading portal.
+
+9)College Management: View only dashboard of whole college with stats and filters.
+
+10)Super admin: Have all the access and can control all the features.
+
+
+
+
