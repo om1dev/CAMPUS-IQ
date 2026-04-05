@@ -4,6 +4,7 @@ const ApiError = require('../utils/ApiError');
 const userService = require('./userService');
 const recordService = require('./recordService');
 const { createSubmissionLog } = require('./auditService');
+const { getSignedUrl } = require('./storageService');
 
 function getNextRole(flow, currentIndex) {
   return flow[currentIndex] || null;
@@ -20,6 +21,48 @@ async function findActiveSubmission(tableName, recordId) {
 
   if (error) throw new ApiError(400, error.message);
   return data;
+}
+
+async function loadRecordSnapshot(tableName, recordId) {
+  const { data, error } = await adminClient
+    .from(tableName)
+    .select('*')
+    .eq('id', recordId)
+    .maybeSingle();
+
+  if (error) throw new ApiError(400, error.message);
+  if (!data) return null;
+
+  if (data.attachment_path) {
+    data.attachment_url = await getSignedUrl(data.attachment_path);
+  } else {
+    data.attachment_url = null;
+  }
+
+  return data;
+}
+
+async function loadLinkedItems(submissionId) {
+  const { data, error } = await adminClient
+    .from('submission_items')
+    .select('*')
+    .eq('submission_id', submissionId)
+    .order('created_at', { ascending: true });
+
+  if (error) throw new ApiError(400, error.message);
+
+  const items = data || [];
+  const output = [];
+
+  for (const item of items) {
+    const linkedRecord = await loadRecordSnapshot(item.table_name, item.record_id);
+    output.push({
+      ...item,
+      record: linkedRecord
+    });
+  }
+
+  return output;
 }
 
 async function createSubmission(tableName, payload, user) {
@@ -71,7 +114,7 @@ async function createSubmission(tableName, payload, user) {
 
   const linkedRecords = Array.isArray(payload.linkedRecords) ? payload.linkedRecords : [];
   if (linkedRecords.length) {
-    const items = linkedRecords.map(item => ({
+    const items = linkedRecords.map((item) => ({
       submission_id: data.id,
       table_name: item.tableName,
       record_id: item.recordId
@@ -127,6 +170,7 @@ function canSeeSubmission(submission, user) {
 
 async function enrichSubmissions(rows) {
   const output = [];
+
   for (const row of rows) {
     const logsRes = await adminClient
       .from('submission_logs')
@@ -134,23 +178,24 @@ async function enrichSubmissions(rows) {
       .eq('submission_id', row.id)
       .order('created_at', { ascending: true });
 
-    const recordRes = await adminClient
-      .from(row.table_name)
-      .select('*')
-      .eq('id', row.record_id)
-      .maybeSingle();
-
     const submitter = await userService.getProfileById(row.submitter_id);
-    const reviewer = row.current_reviewer_id ? await userService.getProfileById(row.current_reviewer_id) : null;
+    const reviewer = row.current_reviewer_id
+      ? await userService.getProfileById(row.current_reviewer_id)
+      : null;
+
+    const record = await loadRecordSnapshot(row.table_name, row.record_id);
+    const linked_items = await loadLinkedItems(row.id);
 
     output.push({
       ...row,
-      record: recordRes.data || null,
+      record,
+      linked_items,
       logs: logsRes.data || [],
       submitter,
       current_reviewer: reviewer
     });
   }
+
   return output;
 }
 
@@ -166,11 +211,11 @@ async function listSubmissions(user, filters = {}) {
   const { data, error } = await query;
   if (error) throw new ApiError(400, error.message);
 
-  let visible = (data || []).filter(row => canSeeSubmission(row, user));
+  let visible = (data || []).filter((row) => canSeeSubmission(row, user));
 
   if (filters.year || filters.search) {
     const enriched = await enrichSubmissions(visible);
-    visible = enriched.filter(item => {
+    visible = enriched.filter((item) => {
       const okYear = filters.year ? Number(item.record?.year) === Number(filters.year) : true;
       const okSearch = filters.search
         ? String(item.record?.title || '').toLowerCase().includes(String(filters.search).toLowerCase())
@@ -238,7 +283,7 @@ async function approveSubmission(id, user, remarks = '') {
   const flow = ROLE_FLOW[submission.submitter_role] || [];
   const nextRole = getNextRole(flow, submission.current_step);
 
-  let patch = {
+  const patch = {
     updated_at: new Date().toISOString(),
     remarks: remarks || submission.remarks
   };
@@ -255,12 +300,10 @@ async function approveSubmission(id, user, remarks = '') {
     patch.current_step = submission.current_step + 1;
   }
 
-  const { data, error } = await adminClient
+  const { error } = await adminClient
     .from('submissions')
     .update(patch)
-    .eq('id', id)
-    .select()
-    .single();
+    .eq('id', id);
 
   if (error) throw new ApiError(400, error.message);
 
