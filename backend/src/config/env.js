@@ -2,7 +2,7 @@ const dotenv = require('dotenv');
 dotenv.config();
 
 module.exports = {
-  port: Number(process.env.PORT || 4000),
+  port: Number(process.env.PORT),
   frontendUrl: process.env.FRONTEND_URL || 'http://localhost:5173',
   supabaseUrl: process.env.SUPABASE_URL || '',
   supabaseAnonKey: process.env.SUPABASE_ANON_KEY || '',
