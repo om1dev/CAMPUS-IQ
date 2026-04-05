@@ -220,11 +220,11 @@ export default function SubmissionPanel({
                          
                          {getDocumentUrl(selected.record) ? (
                             <div className="rounded-xl overflow-hidden border border-slate-200 bg-slate-50 flex flex-col items-center group">
-                               <div className="w-full h-[200px] flex items-center justify-center bg-slate-100 relative">
+                               <div className="w-full h-[300px] flex items-center justify-center bg-slate-100 relative">
                                   {selected.record?.attachment_path?.match(/\.(jpeg|jpg|gif|png)$/i) ? (
-                                     <img src={getDocumentUrl(selected.record)} alt="Attachment" className="object-cover w-full h-full opacity-90 group-hover:opacity-100 transition-opacity" />
+                                     <img src={getDocumentUrl(selected.record)} alt="Attachment" className="object-contain w-full h-full" />
                                   ) : (
-                                     <iframe src={getDocumentUrl(selected.record)} title="Document Preview" className="w-full h-full bg-white text-xs border-0" />
+                                     <iframe src={`https://docs.google.com/gview?url=${encodeURIComponent(getDocumentUrl(selected.record))}&embedded=true`} title="Document Preview" className="w-full h-full bg-white text-xs border-0" />
                                   )}
                                </div>
                                <a 
