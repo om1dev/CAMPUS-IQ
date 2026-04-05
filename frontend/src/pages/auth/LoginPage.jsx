@@ -88,13 +88,13 @@ export default function LoginPage() {
             >
               Login
             </button>
-            <button
+            {/* <button
               className={`flex-1 rounded-2xl px-4 py-3 text-sm font-bold ${mode === 'signup' ? 'bg-white text-slate-900 shadow' : 'text-slate-500'}`}
               onClick={() => setMode('signup')}
               type="button"
             >
               Student Signup
-            </button>
+            </button> */}
           </div>
 
           <form onSubmit={submit} className="space-y-4">
