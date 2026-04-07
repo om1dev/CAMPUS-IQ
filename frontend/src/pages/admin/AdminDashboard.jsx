@@ -12,21 +12,43 @@ import SubmissionPanel from '../../components/SubmissionPanel';
 import AnalyticsCards from '../../components/AnalyticsCards';
 import StatusBadge from '../../components/StatusBadge';
 import SuccessPopup from '../../components/SuccessPopup';
+import UserRoster from '../../components/UserRoster';
 import { RD_TABLES } from '../../lib/tableConfig';
 import { createRecord } from '../../services/recordService';
 import { getAnalytics } from '../../services/analyticsService';
 import { approveSubmission, getSubmissions, rejectSubmission } from '../../services/submissionService';
+import { addStudent, addFaculty, addHod, getUsers } from '../../services/userService';
 
 const sidebarItems = [
-  { id: 'overview',  label: 'Overview',        icon: BarChart2 },
-  { id: 'approvals', label: 'Final Approvals',  icon: ShieldCheck },
-  { id: 'new',       label: 'Create Record',    icon: PenTool },
+  { id: 'overview',  label: 'Overview',       icon: BarChart2 },
+  { id: 'approvals', label: 'Final Approvals', icon: ShieldCheck },
+  { id: 'users',     label: 'Manage Users',    icon: Users },
+  { id: 'new',       label: 'Create Record',   icon: PenTool },
 ];
 
 const ADMIN_ROLE_TABS = [
   { role: 'student', label: 'Students', icon: GraduationCap },
   { role: 'faculty', label: 'Faculty',  icon: UserCog },
   { role: 'hod',     label: 'HOD',      icon: UserCheck },
+];
+
+const STUDENT_FIELDS = [
+  { name: 'full_name', label: 'Full Name',        placeholder: 'Student full name',       fullWidth: true },
+  { name: 'email',     label: 'Email',            type: 'email', placeholder: 'student@university.edu', fullWidth: true },
+  { name: 'year',      label: 'Academic Year',    type: 'number', placeholder: 'e.g. 2024' },
+  { name: 'password',  label: 'Default Password', defaultValue: 'Student@123' },
+];
+
+const FACULTY_FIELDS = [
+  { name: 'full_name', label: 'Full Name',        placeholder: 'Faculty full name',       fullWidth: true },
+  { name: 'email',     label: 'Email',            type: 'email', placeholder: 'faculty@university.edu', fullWidth: true },
+  { name: 'password',  label: 'Default Password', defaultValue: 'Faculty@123',            fullWidth: true },
+];
+
+const HOD_FIELDS = [
+  { name: 'full_name', label: 'Full Name',        placeholder: 'HOD full name',           fullWidth: true },
+  { name: 'email',     label: 'Email',            type: 'email', placeholder: 'hod@university.edu',     fullWidth: true },
+  { name: 'password',  label: 'Default Password', defaultValue: 'Hod@123',                fullWidth: true },
 ];
 
 const ROLE_COLOR = {
@@ -43,6 +65,10 @@ export default function AdminDashboard() {
   const [analytics,   setAnalytics]   = useState(null);
   const [submissions, setSubmissions] = useState([]);
   const [popup,       setPopup]       = useState(null);
+  const [userTab,     setUserTab]     = useState('student');
+  const [students,    setStudents]    = useState([]);
+  const [faculty,     setFaculty]     = useState([]);
+  const [hods,        setHods]        = useState([]);
 
   const currentTable = useMemo(() => RD_TABLES[tableName], [tableName]);
 
@@ -60,9 +86,18 @@ export default function AdminDashboard() {
 
   async function load() {
     try {
-      const [aRes, sRes] = await Promise.all([getAnalytics(), getSubmissions()]);
+      const [aRes, sRes, stuRes, facRes, hodRes] = await Promise.all([
+        getAnalytics(),
+        getSubmissions(),
+        getUsers({ role: 'student' }),
+        getUsers({ role: 'faculty' }),
+        getUsers({ role: 'hod' }),
+      ]);
       setAnalytics(aRes.analytics);
       setSubmissions(sRes.submissions || []);
+      setStudents(stuRes.users || []);
+      setFaculty(facRes.users || []);
+      setHods(hodRes.users || []);
     } catch {
       toast.error('Failed to load data');
     }
@@ -73,15 +108,32 @@ export default function AdminDashboard() {
   async function saveDraft(values) {
     const res = await createRecord(tableName, values);
     await load();
-    setPopup({
-      type: 'created',
-      title: 'Record Created',
-      message: 'The R&D record has been saved successfully.',
-      meta: [
-        { label: 'Title', value: res?.record?.title || values?.title || 'Record' },
-        { label: 'Type',  value: RD_TABLES[tableName]?.label || tableName },
-      ],
-    });
+    setPopup({ type: 'created', title: 'Record Created', message: 'The R&D record has been saved successfully.',
+      meta: [{ label: 'Title', value: res?.record?.title || values?.title }, { label: 'Type', value: RD_TABLES[tableName]?.label || tableName }] });
+  }
+
+  async function handleAddStudent(form) {
+    try {
+      await addStudent(form); await load();
+      setPopup({ type: 'created', title: 'Student Added', message: `${form.full_name} has been provisioned.`,
+        meta: [{ label: 'Name', value: form.full_name }, { label: 'Email', value: form.email }] });
+    } catch (err) { toast.error(err?.response?.data?.message || 'Failed to add student'); }
+  }
+
+  async function handleAddFaculty(form) {
+    try {
+      await addFaculty(form); await load();
+      setPopup({ type: 'created', title: 'Faculty Added', message: `${form.full_name} has been provisioned.`,
+        meta: [{ label: 'Name', value: form.full_name }, { label: 'Email', value: form.email }] });
+    } catch (err) { toast.error(err?.response?.data?.message || 'Failed to add faculty'); }
+  }
+
+  async function handleAddHod(form) {
+    try {
+      await addHod(form); await load();
+      setPopup({ type: 'created', title: 'HOD Added', message: `${form.full_name} has been provisioned.`,
+        meta: [{ label: 'Name', value: form.full_name }, { label: 'Email', value: form.email }] });
+    } catch (err) { toast.error(err?.response?.data?.message || 'Failed to add HOD'); }
   }
 
   return (
@@ -311,6 +363,42 @@ export default function AdminDashboard() {
           onApprove={async (id, r) => { await approveSubmission(id, r); await load(); }}
           onReject={async (id, r)  => { await rejectSubmission(id, r);  await load(); }}
         />
+      )}
+
+      {/* ── MANAGE USERS ── */}
+      {activeTab === 'users' && (
+        <div className="space-y-5">
+          <div className="flex gap-2 rounded-2xl bg-white p-1.5 shadow-sm ring-1 ring-slate-200 w-fit">
+            {[
+              { id: 'student', label: 'Students', icon: GraduationCap },
+              { id: 'faculty', label: 'Faculty',  icon: UserCog },
+              { id: 'hod',     label: 'HOD',      icon: UserCheck },
+            ].map(({ id, label, icon: Icon }) => (
+              <button key={id} onClick={() => setUserTab(id)}
+                className={`flex items-center gap-2 rounded-xl px-5 py-2.5 text-[13px] font-bold transition-all ${
+                  userTab === id ? 'bg-gradient-to-r from-sky-600 to-indigo-600 text-white shadow-md' : 'text-slate-500 hover:text-slate-900'
+                }`}>
+                <Icon size={15} /> {label}
+              </button>
+            ))}
+          </div>
+
+          {userTab === 'student' && (
+            <UserRoster title="Student" subtitle="All students in the system" users={students}
+              addForm={STUDENT_FIELDS} onAdd={handleAddStudent} onDeleted={load}
+              accentColor="sky" roleLabel="student" />
+          )}
+          {userTab === 'faculty' && (
+            <UserRoster title="Faculty" subtitle="All faculty members" users={faculty}
+              addForm={FACULTY_FIELDS} onAdd={handleAddFaculty} onDeleted={load}
+              accentColor="indigo" roleLabel="faculty" />
+          )}
+          {userTab === 'hod' && (
+            <UserRoster title="HOD" subtitle="All heads of department" users={hods}
+              addForm={HOD_FIELDS} onAdd={handleAddHod} onDeleted={load}
+              accentColor="violet" roleLabel="HOD" />
+          )}
+        </div>
       )}
 
       {/* ── CREATE RECORD ── */}

@@ -81,9 +81,51 @@ async function assignedStudents(req, res) {
   return res.json({ success: true, users });
 }
 
+async function addHod(req, res) {
+  const creator = req.user;
+
+  const department_id = creator.profile.role === 'admin' || creator.profile.role === 'superadmin'
+    ? (req.body.department_id || null)
+    : null;
+
+  const result = await authService.createUserByAdmin({
+    ...req.body,
+    role: 'hod',
+    department_id
+  }, creator);
+
+  return res.json({ success: true, message: 'HOD created successfully', ...result });
+}
+
+async function deleteUser(req, res) {
+  const { id } = req.params;
+  const actor = req.user.profile;
+
+  const target = await userService.getProfileById(id);
+  if (!target) {
+    return res.status(404).json({ success: false, message: 'User not found' });
+  }
+
+  const allowed = {
+    faculty:    ['student'],
+    hod:        ['student', 'faculty'],
+    admin:      ['student', 'faculty', 'hod'],
+    superadmin: ['student', 'faculty', 'hod', 'admin'],
+  };
+
+  if (!allowed[actor.role]?.includes(target.role)) {
+    return res.status(403).json({ success: false, message: `${actor.role} cannot delete a ${target.role}` });
+  }
+
+  await userService.deleteUserById(id);
+  return res.json({ success: true, message: 'User deleted successfully' });
+}
+
 module.exports = {
   addStudent,
   addFaculty,
+  addHod,
+  deleteUser,
   listUsers,
   assignedStudents
 };

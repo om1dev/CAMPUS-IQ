@@ -8,6 +8,7 @@ import StatusBadge from './StatusBadge';
 import Timeline from './Timeline';
 import TableToolbar from './TableToolbar';
 import SuccessPopup from './SuccessPopup';
+import RejectRemarkModal from './RejectRemarkModal';
 
 // ─── Submission list + detail panel (reusable) ───────────────────────────────
 function SubmissionList({ items, selected, setSelected, canReview, onApprove, onReject, getDocumentUrl, setPreviewRecord }) {
@@ -239,6 +240,7 @@ export default function SubmissionPanel({
   const [previewRecord, setPreviewRecord] = useState(null);
   const [activeRole,    setActiveRole]    = useState(roleTabs?.[0]?.role ?? null);
   const [popup,         setPopup]         = useState(null);
+  const [rejectTarget,  setRejectTarget]  = useState(null); // item pending rejection
 
   // Reset selected when switching role tab
   function switchRole(role) {
@@ -303,12 +305,17 @@ export default function SubmissionPanel({
     }
   }
 
-  async function handleReject(item) {
-    const remarks = window.prompt('Rejection remarks', 'Rejected');
-    if (remarks === null) return;
+  // Rejection is now a two-step: set target → modal collects remark → executes
+  function handleRejectClick(item) {
+    setRejectTarget(item);
+  }
+
+  async function executeReject(remark) {
+    const item = rejectTarget;
+    setRejectTarget(null);
     setLoadingTask('Processing Rejection…');
     try {
-      await onReject(item.id, remarks);
+      await onReject(item.id, remark);
       await artificialDelay();
       setSelected(null);
       setPopup({
@@ -318,7 +325,7 @@ export default function SubmissionPanel({
         meta: [
           { label: 'Record',  value: item.record?.title || '—' },
           { label: 'By',      value: item.submitter?.full_name || item.submitter?.email || '—' },
-          { label: 'Remarks', value: remarks },
+          { label: 'Reason',  value: remark },
         ],
       });
     } catch {
@@ -413,6 +420,13 @@ export default function SubmissionPanel({
         onClose={() => setPopup(null)}
       />
 
+      <RejectRemarkModal
+        visible={!!rejectTarget}
+        recordTitle={rejectTarget?.record?.title}
+        onConfirm={executeReject}
+        onCancel={() => setRejectTarget(null)}
+      />
+
       {/* Toolbar */}
       <TableToolbar title={title} rows={exportRows} filters={filters} setFilters={setFilters} />
 
@@ -469,7 +483,7 @@ export default function SubmissionPanel({
               setSelected={setSelected}
               canReview={canReview}
               onApprove={handleApprove}
-              onReject={handleReject}
+              onReject={handleRejectClick}
               getDocumentUrl={getDocumentUrl}
               setPreviewRecord={setPreviewRecord}
             />
