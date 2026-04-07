@@ -11,6 +11,7 @@ import DynamicForm from '../../components/DynamicForm';
 import SubmissionPanel from '../../components/SubmissionPanel';
 import AnalyticsCards from '../../components/AnalyticsCards';
 import StatusBadge from '../../components/StatusBadge';
+import SuccessPopup from '../../components/SuccessPopup';
 import { RD_TABLES } from '../../lib/tableConfig';
 import { createRecord } from '../../services/recordService';
 import { getAnalytics } from '../../services/analyticsService';
@@ -41,6 +42,7 @@ export default function AdminDashboard() {
   const [tableName,   setTableName]   = useState('awards');
   const [analytics,   setAnalytics]   = useState(null);
   const [submissions, setSubmissions] = useState([]);
+  const [popup,       setPopup]       = useState(null);
 
   const currentTable = useMemo(() => RD_TABLES[tableName], [tableName]);
 
@@ -69,9 +71,17 @@ export default function AdminDashboard() {
   useEffect(() => { load(); }, []);
 
   async function saveDraft(values) {
-    await createRecord(tableName, values);
-    toast.success('Record created');
-    load();
+    const res = await createRecord(tableName, values);
+    await load();
+    setPopup({
+      type: 'created',
+      title: 'Record Created',
+      message: 'The R&D record has been saved successfully.',
+      meta: [
+        { label: 'Title', value: res?.record?.title || values?.title || 'Record' },
+        { label: 'Type',  value: RD_TABLES[tableName]?.label || tableName },
+      ],
+    });
   }
 
   return (
@@ -320,6 +330,16 @@ export default function AdminDashboard() {
           <DynamicForm tableName={tableName} tableConfig={currentTable} onSave={saveDraft} />
         </div>
       )}
+
+      <SuccessPopup
+        visible={!!popup}
+        type={popup?.type}
+        title={popup?.title}
+        message={popup?.message}
+        meta={popup?.meta}
+        onAction={popup?.onAction}
+        onClose={() => setPopup(null)}
+      />
 
     </AppLayout>
   );

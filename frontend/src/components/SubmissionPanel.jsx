@@ -7,6 +7,7 @@ import {
 import StatusBadge from './StatusBadge';
 import Timeline from './Timeline';
 import TableToolbar from './TableToolbar';
+import SuccessPopup from './SuccessPopup';
 
 // ─── Submission list + detail panel (reusable) ───────────────────────────────
 function SubmissionList({ items, selected, setSelected, canReview, onApprove, onReject, getDocumentUrl, setPreviewRecord }) {
@@ -237,6 +238,7 @@ export default function SubmissionPanel({
   const [loadingTask,   setLoadingTask]   = useState(null);
   const [previewRecord, setPreviewRecord] = useState(null);
   const [activeRole,    setActiveRole]    = useState(roleTabs?.[0]?.role ?? null);
+  const [popup,         setPopup]         = useState(null);
 
   // Reset selected when switching role tab
   function switchRole(role) {
@@ -283,8 +285,17 @@ export default function SubmissionPanel({
     try {
       await onApprove(item.id, remarks);
       await artificialDelay();
-      toast.success('Approved successfully');
       setSelected(null);
+      setPopup({
+        type: 'approve',
+        title: 'Submission Approved',
+        message: 'The record has been approved and forwarded to the next level.',
+        meta: [
+          { label: 'Record',  value: item.record?.title || '—' },
+          { label: 'By',      value: item.submitter?.full_name || item.submitter?.email || '—' },
+          { label: 'Remarks', value: remarks },
+        ],
+      });
     } catch {
       toast.error('Approval failed');
     } finally {
@@ -299,8 +310,17 @@ export default function SubmissionPanel({
     try {
       await onReject(item.id, remarks);
       await artificialDelay();
-      toast.success('Rejected successfully');
       setSelected(null);
+      setPopup({
+        type: 'reject',
+        title: 'Submission Rejected',
+        message: 'The record has been rejected. The submitter will be notified.',
+        meta: [
+          { label: 'Record',  value: item.record?.title || '—' },
+          { label: 'By',      value: item.submitter?.full_name || item.submitter?.email || '—' },
+          { label: 'Remarks', value: remarks },
+        ],
+      });
     } catch {
       toast.error('Rejection failed');
     } finally {
@@ -382,6 +402,16 @@ export default function SubmissionPanel({
           </div>
         </div>
       )}
+
+      <SuccessPopup
+        visible={!!popup}
+        type={popup?.type}
+        title={popup?.title}
+        message={popup?.message}
+        meta={popup?.meta}
+        onAction={popup?.onAction}
+        onClose={() => setPopup(null)}
+      />
 
       {/* Toolbar */}
       <TableToolbar title={title} rows={exportRows} filters={filters} setFilters={setFilters} />

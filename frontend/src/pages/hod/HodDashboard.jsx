@@ -10,6 +10,7 @@ import DynamicForm from '../../components/DynamicForm';
 import SubmissionPanel from '../../components/SubmissionPanel';
 import AnalyticsOverview from '../../components/AnalyticsOverview';
 import StatusBadge from '../../components/StatusBadge';
+import SuccessPopup from '../../components/SuccessPopup';
 import { RD_TABLES } from '../../lib/tableConfig';
 import { createRecord } from '../../services/recordService';
 import { approveSubmission, getSubmissions, rejectSubmission, submitRecord } from '../../services/submissionService';
@@ -28,6 +29,7 @@ export default function HodDashboard() {
   const [submissions,    setSubmissions]    = useState([]);
   const [facultyMembers, setFacultyMembers] = useState([]);
   const [facultyForm,    setFacultyForm]    = useState({ full_name: '', email: '', password: 'Faculty@123' });
+  const [popup,          setPopup]          = useState(null);
 
   const currentTable = useMemo(() => RD_TABLES[tableName], [tableName]);
 
@@ -51,20 +53,48 @@ export default function HodDashboard() {
     const res = await createRecord(tableName, values);
     if (window.confirm('Submit this record to Admin now?')) {
       await submitRecord(tableName, { recordId: res.record.id, remarks: 'HOD submission' });
-      toast.success('Submitted to Admin');
+      await load();
+      setPopup({
+        type: 'submit',
+        title: 'Submitted to Admin',
+        message: 'Your R&D record has been forwarded to the Admin for final approval.',
+        meta: [
+          { label: 'Record', value: res?.record?.title || values?.title || 'Record' },
+          { label: 'Type',   value: RD_TABLES[tableName]?.label || tableName },
+          { label: 'Next',   value: 'Admin Review' },
+        ],
+        onAction: { label: 'View Queue', fn: () => setActiveTab('approvals') },
+      });
     } else {
-      toast.success('Draft saved');
+      await load();
+      setPopup({
+        type: 'draft',
+        title: 'Draft Saved',
+        message: 'Record saved locally. Submit it to Admin when ready.',
+        meta: [
+          { label: 'Title', value: res?.record?.title || values?.title || 'Record' },
+          { label: 'Type',  value: RD_TABLES[tableName]?.label || tableName },
+        ],
+      });
     }
-    load();
   }
 
   async function createFaculty(e) {
     e.preventDefault();
     try {
       await addFaculty(facultyForm);
-      toast.success('Faculty added');
+      const name = facultyForm.full_name;
       setFacultyForm({ full_name: '', email: '', password: 'Faculty@123' });
-      load();
+      await load();
+      setPopup({
+        type: 'created',
+        title: 'Faculty Added',
+        message: `${name} has been provisioned and assigned to your department.`,
+        meta: [
+          { label: 'Name',  value: name },
+          { label: 'Email', value: facultyForm.email },
+        ],
+      });
     } catch (err) {
       toast.error(err?.response?.data?.message || 'Failed to add faculty');
     }
@@ -248,6 +278,16 @@ export default function HodDashboard() {
           <DynamicForm tableName={tableName} tableConfig={currentTable} onSave={saveDraft} />
         </div>
       )}
+
+      <SuccessPopup
+        visible={!!popup}
+        type={popup?.type}
+        title={popup?.title}
+        message={popup?.message}
+        meta={popup?.meta}
+        onAction={popup?.onAction}
+        onClose={() => setPopup(null)}
+      />
 
     </AppLayout>
   );

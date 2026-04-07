@@ -10,6 +10,7 @@ import DynamicForm from '../../components/DynamicForm';
 import SubmissionPanel from '../../components/SubmissionPanel';
 import AnalyticsOverview from '../../components/AnalyticsOverview';
 import StatusBadge from '../../components/StatusBadge';
+import SuccessPopup from '../../components/SuccessPopup';
 import { RD_TABLES } from '../../lib/tableConfig';
 import { createRecord, getRecords } from '../../services/recordService';
 import { approveSubmission, getSubmissions, rejectSubmission, submitRecord } from '../../services/submissionService';
@@ -33,6 +34,7 @@ export default function FacultyDashboard() {
   const [students,     setStudents]     = useState([]);
   const [loadingTask,  setLoadingTask]  = useState(null);
   const [studentForm,  setStudentForm]  = useState({ full_name: '', email: '', password: 'Student@123', year: '' });
+  const [popup,        setPopup]        = useState(null);
 
   const currentTable = useMemo(() => RD_TABLES[tableName], [tableName]);
 
@@ -55,28 +57,56 @@ export default function FacultyDashboard() {
 
   async function saveDraft(values) {
     const res = await createRecord(tableName, values);
-    toast.success('Record saved');
     if (window.confirm('Submit this record to HOD now?')) {
       setLoadingTask('Submitting to HOD…');
       try {
         await submitRecord(tableName, { recordId: res.record.id, remarks: 'Faculty submission' });
-        toast.success('Submitted to HOD');
+        await load();
+        setPopup({
+          type: 'submit',
+          title: 'Submitted to HOD',
+          message: 'Your R&D record has been routed to the HOD for departmental review.',
+          meta: [
+            { label: 'Record', value: res?.record?.title || values?.title || 'Record' },
+            { label: 'Type',   value: RD_TABLES[tableName]?.label || tableName },
+            { label: 'Next',   value: 'HOD Review' },
+          ],
+          onAction: { label: 'View Submissions', fn: () => setActiveTab('approvals') },
+        });
       } catch {
         toast.error('Submission failed');
       } finally {
         setLoadingTask(null);
       }
+    } else {
+      await load();
+      setPopup({
+        type: 'draft',
+        title: 'Draft Saved',
+        message: 'Record saved. You can submit it to HOD from the Approval Queue tab.',
+        meta: [
+          { label: 'Title', value: res?.record?.title || values?.title || 'Record' },
+          { label: 'Type',  value: RD_TABLES[tableName]?.label || tableName },
+        ],
+      });
     }
-    await load();
   }
 
   async function createStudent(e) {
     e.preventDefault();
     try {
       await addStudent(studentForm);
-      toast.success('Student added');
       setStudentForm({ full_name: '', email: '', password: 'Student@123', year: '' });
-      load();
+      await load();
+      setPopup({
+        type: 'created',
+        title: 'Student Added',
+        message: `${studentForm.full_name} has been provisioned and assigned to you.`,
+        meta: [
+          { label: 'Name',  value: studentForm.full_name },
+          { label: 'Email', value: studentForm.email },
+        ],
+      });
     } catch (err) {
       toast.error(err?.response?.data?.message || 'Failed to add student');
     }
@@ -270,6 +300,16 @@ export default function FacultyDashboard() {
           <DynamicForm tableName={tableName} tableConfig={currentTable} onSave={saveDraft} />
         </div>
       )}
+
+      <SuccessPopup
+        visible={!!popup}
+        type={popup?.type}
+        title={popup?.title}
+        message={popup?.message}
+        meta={popup?.meta}
+        onAction={popup?.onAction}
+        onClose={() => setPopup(null)}
+      />
 
     </AppLayout>
   );

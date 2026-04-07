@@ -10,6 +10,7 @@ import DynamicForm from '../../components/DynamicForm';
 import SubmissionPanel from '../../components/SubmissionPanel';
 import AnalyticsOverview from '../../components/AnalyticsOverview';
 import StatusBadge from '../../components/StatusBadge';
+import SuccessPopup from '../../components/SuccessPopup';
 import { RD_TABLES } from '../../lib/tableConfig';
 import { createRecord, getRecords } from '../../services/recordService';
 import { getSubmissions, submitRecord } from '../../services/submissionService';
@@ -36,6 +37,7 @@ export default function StudentDashboard() {
   const [records,      setRecords]      = useState([]);
   const [submissions,  setSubmissions]  = useState([]);
   const [loadingTask,  setLoadingTask]  = useState(null);
+  const [popup,        setPopup]        = useState(null); // { type, title, message, meta, onAction }
 
   const currentTable = useMemo(() => RD_TABLES[tableName], [tableName]);
 
@@ -52,10 +54,19 @@ export default function StudentDashboard() {
   useEffect(() => { load(); }, [tableName]);
 
   async function saveDraft(values) {
-    await createRecord(tableName, values);
-    toast.success('Draft saved');
+    const res = await createRecord(tableName, values);
     setActiveTab('drafts');
     await load();
+    setPopup({
+      type: 'draft',
+      title: 'Draft Saved',
+      message: 'Your record has been saved locally. Submit it when ready to enter the approval workflow.',
+      meta: [
+        { label: 'Title', value: res?.record?.title || values?.title || 'Record' },
+        { label: 'Type',  value: RD_TABLES[tableName]?.label || tableName },
+      ],
+      onAction: { label: 'Submit Now', fn: () => {} },
+    });
   }
 
   async function routeRecord(record) {
@@ -63,9 +74,19 @@ export default function StudentDashboard() {
     setLoadingTask('Submitting for review…');
     try {
       await submitRecord(tableName, { recordId: record.id, remarks: 'Student submission' });
-      toast.success('Submitted successfully');
       setActiveTab('workflows');
       await load();
+      setPopup({
+        type: 'submit',
+        title: 'Submitted Successfully',
+        message: 'Your record has been routed to your assigned faculty for review.',
+        meta: [
+          { label: 'Record', value: record.title },
+          { label: 'Next',   value: 'Faculty Review' },
+          { label: 'Year',   value: record.year || '—' },
+        ],
+        onAction: { label: 'View Submissions', fn: () => setActiveTab('workflows') },
+      });
     } catch {
       toast.error('Submission failed');
     } finally {
@@ -397,6 +418,16 @@ export default function StudentDashboard() {
       {activeTab === 'workflows' && (
         <SubmissionPanel title="My Submissions" submissions={submissions} />
       )}
+
+      <SuccessPopup
+        visible={!!popup}
+        type={popup?.type}
+        title={popup?.title}
+        message={popup?.message}
+        meta={popup?.meta}
+        onAction={popup?.onAction}
+        onClose={() => setPopup(null)}
+      />
 
     </AppLayout>
   );
