@@ -1,70 +1,307 @@
 import { useMemo, useState } from 'react';
 import toast from 'react-hot-toast';
-import { CheckCircle2, XCircle, ChevronRight, FileDigit, Eye, Download, Info, Loader2 } from 'lucide-react';
+import {
+  CheckCircle2, XCircle, FileDigit, Eye,
+  Download, Info, Loader2, X, ExternalLink
+} from 'lucide-react';
 import StatusBadge from './StatusBadge';
 import Timeline from './Timeline';
 import TableToolbar from './TableToolbar';
 
+// ─── Submission list + detail panel (reusable) ───────────────────────────────
+function SubmissionList({ items, selected, setSelected, canReview, onApprove, onReject, getDocumentUrl, setPreviewRecord }) {
+  return (
+    <div className="space-y-2.5">
+      {items.length ? items.map((item) => (
+        <div
+          key={item.id}
+          onClick={() => setSelected(item)}
+          className={`group relative rounded-xl border p-4 cursor-pointer transition-all hover:shadow-sm ${
+            selected?.id === item.id
+              ? 'border-sky-500 bg-sky-50/40 ring-1 ring-inset ring-sky-500/40'
+              : 'border-slate-200 bg-white hover:border-slate-300'
+          }`}
+        >
+          {/* Top row */}
+          <div className="flex items-start justify-between gap-3">
+            <div className="min-w-0 flex-1">
+              <p className="text-sm font-bold text-slate-900 leading-snug truncate">
+                {item.record?.title || '—'}
+              </p>
+              <div className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-0.5 text-[11px] text-slate-400">
+                <span className="capitalize font-medium">{item.table_name?.replace(/_/g, ' ')}</span>
+                <span>·</span>
+                <span className="font-semibold text-slate-600">{item.submitter?.full_name || item.submitter?.email || '—'}</span>
+              </div>
+            </div>
+            <StatusBadge status={item.status} />
+          </div>
+
+          {/* Bottom row */}
+          <div className="mt-3 flex flex-wrap items-center justify-between gap-2 border-t border-slate-100 pt-3">
+            <div className="flex gap-2">
+              <span className="rounded-md border border-slate-200 bg-white px-2 py-0.5 text-[11px] font-semibold text-slate-500">
+                {item.record?.year || '—'}
+              </span>
+              <span className="rounded-md border border-slate-200 bg-slate-50 px-2 py-0.5 text-[11px] font-semibold text-slate-500 capitalize">
+                {item.current_reviewer_role ? `Pending ${item.current_reviewer_role}` : 'Completed'}
+              </span>
+            </div>
+
+            <div className="flex gap-1.5">
+              {getDocumentUrl(item.record) && (
+                <button
+                  onClick={e => { e.stopPropagation(); setPreviewRecord(item.record); }}
+                  className="inline-flex items-center gap-1 rounded-lg bg-sky-50 px-2.5 py-1.5 text-[11px] font-bold text-sky-700 ring-1 ring-inset ring-sky-200 hover:bg-sky-500 hover:text-white transition-all"
+                >
+                  <Eye size={13} /> Preview
+                </button>
+              )}
+              {canReview && (
+                <>
+                  <button
+                    onClick={e => { e.stopPropagation(); onApprove(item); }}
+                    className="inline-flex items-center gap-1 rounded-lg bg-emerald-50 px-2.5 py-1.5 text-[11px] font-bold text-emerald-700 ring-1 ring-inset ring-emerald-200 hover:bg-emerald-500 hover:text-white transition-all"
+                  >
+                    <CheckCircle2 size={13} /> Approve
+                  </button>
+                  <button
+                    onClick={e => { e.stopPropagation(); onReject(item); }}
+                    className="inline-flex items-center gap-1 rounded-lg bg-rose-50 px-2.5 py-1.5 text-[11px] font-bold text-rose-700 ring-1 ring-inset ring-rose-200 hover:bg-rose-500 hover:text-white transition-all"
+                  >
+                    <XCircle size={13} /> Reject
+                  </button>
+                </>
+              )}
+            </div>
+          </div>
+        </div>
+      )) : (
+        <div className="flex flex-col items-center justify-center rounded-xl border border-dashed border-slate-200 bg-slate-50 py-14 text-center">
+          <div className="mb-3 flex h-12 w-12 items-center justify-center rounded-xl bg-white shadow-sm ring-1 ring-slate-200">
+            <FileDigit size={20} className="text-slate-300" />
+          </div>
+          <p className="text-sm font-bold text-slate-700">No submissions here</p>
+          <p className="mt-1 text-xs text-slate-400 max-w-[220px]">Nothing to review in this category right now.</p>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ─── Detail panel (right side) ───────────────────────────────────────────────
+function DetailPanel({ selected, getDocumentUrl, setPreviewRecord }) {
+  const [rightTab, setRightTab] = useState('details');
+
+  if (!selected) {
+    return (
+      <div className="flex flex-col items-center justify-center rounded-2xl border border-dashed border-slate-200 bg-slate-50/60 py-20 text-center h-full min-h-[400px]">
+        <div className="mb-3 flex h-12 w-12 items-center justify-center rounded-xl bg-white shadow-sm ring-1 ring-slate-200">
+          <Info size={20} className="text-slate-300" />
+        </div>
+        <p className="text-sm font-bold text-slate-700">Select a submission</p>
+        <p className="mt-1 text-xs text-slate-400 max-w-[200px]">Click any record on the left to view its details and timeline.</p>
+      </div>
+    );
+  }
+
+  return (
+    <div className="flex flex-col gap-4 h-full">
+      {/* Tab switcher */}
+      <div className="flex rounded-xl bg-white p-1 shadow-sm ring-1 ring-slate-200">
+        {[
+          { id: 'details',  label: 'Record Details' },
+          { id: 'timeline', label: 'Approval Timeline' },
+        ].map(t => (
+          <button
+            key={t.id}
+            onClick={() => setRightTab(t.id)}
+            className={`flex-1 rounded-lg py-2 text-xs font-bold transition-all ${
+              rightTab === t.id ? 'bg-slate-900 text-white shadow-sm' : 'text-slate-500 hover:text-slate-800'
+            }`}
+          >
+            {t.label}
+          </button>
+        ))}
+      </div>
+
+      {rightTab === 'details' && (
+        <div className="flex-1 rounded-2xl bg-white p-6 shadow-sm ring-1 ring-slate-200 overflow-y-auto animate-fade-in">
+          {/* Submitter info */}
+          <div className="mb-5 pb-5 border-b border-slate-100">
+            <p className="text-[10px] font-bold uppercase tracking-widest text-slate-400 mb-2">Submitted By</p>
+            <div className="flex items-center gap-3">
+              <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-slate-100 text-slate-500 flex-shrink-0 text-sm font-black">
+                {(selected.submitter?.full_name || '?')[0].toUpperCase()}
+              </div>
+              <div>
+                <p className="text-sm font-bold text-slate-900">{selected.submitter?.full_name || '—'}</p>
+                <p className="text-[11px] text-slate-400">{selected.submitter?.email || '—'} · <span className="capitalize">{selected.submitter_role}</span></p>
+              </div>
+            </div>
+          </div>
+
+          {/* Record fields */}
+          <div className="mb-5">
+            <p className="text-[10px] font-bold uppercase tracking-widest text-slate-400 mb-3">Record Fields</p>
+            {selected.record?.data && Object.keys(selected.record.data).length > 0 ? (
+              <div className="grid grid-cols-2 gap-x-4 gap-y-4">
+                {Object.entries(selected.record.data).map(([key, value]) => (
+                  <div key={key} className={String(value || '').length > 40 ? 'col-span-2' : ''}>
+                    <p className="text-[10px] font-bold uppercase tracking-widest text-slate-400 mb-0.5">{key.replace(/_/g, ' ')}</p>
+                    <p className="text-sm font-semibold text-slate-800 break-words">{value || '—'}</p>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <p className="text-xs text-slate-400 italic">No additional fields.</p>
+            )}
+          </div>
+
+          {/* Remarks */}
+          {selected.remarks && (
+            <div className="mb-5 rounded-xl bg-amber-50 border border-amber-100 px-4 py-3">
+              <p className="text-[10px] font-bold uppercase tracking-widest text-amber-600 mb-1">Remarks</p>
+              <p className="text-xs font-semibold text-amber-800">{selected.remarks}</p>
+            </div>
+          )}
+
+          {/* Document */}
+          <div>
+            <p className="text-[10px] font-bold uppercase tracking-widest text-slate-400 mb-3 flex items-center gap-1.5">
+              <Eye size={12} /> Attachment
+            </p>
+            {getDocumentUrl(selected.record) ? (
+              <div className="rounded-xl overflow-hidden border border-slate-200">
+                <div className="h-52 bg-slate-100">
+                  {selected.record?.attachment_path?.match(/\.(jpeg|jpg|gif|png|webp)$/i) ? (
+                    <img src={getDocumentUrl(selected.record)} alt="Attachment" className="w-full h-full object-contain" />
+                  ) : (
+                    <iframe
+                      src={`https://docs.google.com/gview?url=${encodeURIComponent(getDocumentUrl(selected.record))}&embedded=true`}
+                      title="Preview"
+                      className="w-full h-full border-0"
+                    />
+                  )}
+                </div>
+                <div className="flex items-center justify-between px-4 py-2.5 bg-white border-t border-slate-100">
+                  <span className="text-[11px] text-slate-400 truncate max-w-[160px]">{selected.record.attachment_path?.split('/').pop()}</span>
+                  <div className="flex gap-2">
+                    <button
+                      onClick={() => setPreviewRecord(selected.record)}
+                      className="flex items-center gap-1 text-[11px] font-bold text-sky-600 hover:text-sky-700"
+                    >
+                      <Eye size={12} /> Expand
+                    </button>
+                    <a
+                      href={getDocumentUrl(selected.record)}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="flex items-center gap-1 text-[11px] font-bold text-slate-600 hover:text-slate-900"
+                    >
+                      <Download size={12} /> Download
+                    </a>
+                  </div>
+                </div>
+              </div>
+            ) : (
+              <div className="rounded-xl border border-dashed border-slate-200 bg-slate-50 p-5 text-center">
+                <FileDigit size={18} className="mx-auto text-slate-300 mb-1.5" />
+                <p className="text-xs text-slate-400">No attachment</p>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
+      {rightTab === 'timeline' && (
+        <div className="animate-fade-in flex-1">
+          <Timeline logs={selected?.logs || []} />
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ─── Main SubmissionPanel ─────────────────────────────────────────────────────
 export default function SubmissionPanel({
   title,
   submissions,
   onApprove,
   onReject,
-  canReview = false
+  canReview = false,
+  roleTabs = null,   // e.g. [{ id:'student', label:'Students', role:'student' }, ...]
 }) {
-  const [selected, setSelected] = useState(null);
-  const [filters, setFilters] = useState({ search: '', year: '' });
-  const [rightTab, setRightTab] = useState('details'); 
-  const [loadingTask, setLoadingTask] = useState(null);
+  const [selected,      setSelected]      = useState(null);
+  const [filters,       setFilters]       = useState({ search: '', year: '' });
+  const [loadingTask,   setLoadingTask]   = useState(null);
+  const [previewRecord, setPreviewRecord] = useState(null);
+  const [activeRole,    setActiveRole]    = useState(roleTabs?.[0]?.role ?? null);
+
+  // Reset selected when switching role tab
+  function switchRole(role) {
+    setActiveRole(role);
+    setSelected(null);
+  }
 
   const filtered = useMemo(() => {
-    return submissions.filter((item) => {
+    return submissions.filter(item => {
+      const roleMatch  = activeRole ? item.submitter_role === activeRole : true;
       const titleMatch = filters.search
         ? String(item.record?.title || '').toLowerCase().includes(filters.search.toLowerCase())
         : true;
-      const yearMatch = filters.year
+      const yearMatch  = filters.year
         ? String(item.record?.year || '') === String(filters.year)
         : true;
-      return titleMatch && yearMatch;
+      return roleMatch && titleMatch && yearMatch;
     });
-  }, [submissions, filters]);
+  }, [submissions, filters, activeRole]);
 
-  const exportRows = filtered.map((item) => ({
-    title: item.record?.title || '',
-    year: item.record?.year || '',
-    table: item.table_name,
-    status: item.status,
-    submitter: item.submitter?.full_name || item.submitter?.email || ''
+  // Count per role tab (unfiltered by search/year so badges always reflect reality)
+  const countByRole = useMemo(() => {
+    if (!roleTabs) return {};
+    return Object.fromEntries(
+      roleTabs.map(t => [t.role, submissions.filter(s => s.submitter_role === t.role).length])
+    );
+  }, [submissions, roleTabs]);
+
+  const exportRows = filtered.map(item => ({
+    title:     item.record?.title || '',
+    year:      item.record?.year  || '',
+    table:     item.table_name,
+    status:    item.status,
+    submitter: item.submitter?.full_name || item.submitter?.email || '',
+    role:      item.submitter_role,
   }));
 
-  const artificialDelay = () => new Promise(resolve => setTimeout(resolve, 10000));
+  const artificialDelay = () => new Promise(r => setTimeout(r, 5000));
 
-  async function approve(item) {
+  async function handleApprove(item) {
     const remarks = window.prompt('Approval remarks', 'Approved');
     if (remarks === null) return;
-    setLoadingTask('Processing Institutional Approval...');
-    
+    setLoadingTask('Processing Approval…');
     try {
       await onApprove(item.id, remarks);
       await artificialDelay();
       toast.success('Approved successfully');
-    } catch (err) {
+      setSelected(null);
+    } catch {
       toast.error('Approval failed');
     } finally {
       setLoadingTask(null);
     }
   }
 
-  async function reject(item) {
+  async function handleReject(item) {
     const remarks = window.prompt('Rejection remarks', 'Rejected');
     if (remarks === null) return;
-    setLoadingTask('Processing Document Rejection...');
-    
+    setLoadingTask('Processing Rejection…');
     try {
       await onReject(item.id, remarks);
       await artificialDelay();
       toast.success('Rejected successfully');
-    } catch (err) {
+      setSelected(null);
+    } catch {
       toast.error('Rejection failed');
     } finally {
       setLoadingTask(null);
@@ -74,192 +311,148 @@ export default function SubmissionPanel({
   function getDocumentUrl(record) {
     if (record?.attachment_url) return record.attachment_url;
     if (record?.attachment_path) {
-       const baseUrl = import.meta.env.VITE_SUPABASE_URL;
-       if (baseUrl) return `${baseUrl}/storage/v1/object/public/rd-files/${record.attachment_path}`;
+      const base = import.meta.env.VITE_SUPABASE_URL;
+      if (base) return `${base}/storage/v1/object/public/rd-files/${record.attachment_path}`;
     }
     return null;
   }
 
   return (
-    <div className="space-y-6 animate-fade-in relative">
-      
-      {/* 10 Second Mandatory Loader Screen */}
+    <div className="space-y-5 animate-fade-in">
+
+      {/* Processing overlay */}
       {loadingTask && (
-        <div className="fixed inset-0 z-[200] flex flex-col items-center justify-center bg-slate-900/50 backdrop-blur-md">
-          <div className="flex w-[300px] flex-col items-center rounded-3xl bg-white p-8 shadow-2xl ring-1 ring-slate-200">
-            <Loader2 size={40} strokeWidth={2.5} className="animate-spin text-sky-500 mb-6" />
-            <h3 className="text-base font-black tracking-tight text-slate-900 text-center">{loadingTask}</h3>
-            <p className="mt-2 text-center text-[10px] font-bold uppercase tracking-widest text-slate-500">Executing verification protocols... Please wait.</p>
+        <div className="fixed inset-0 z-[200] flex items-center justify-center bg-slate-900/40 backdrop-blur-sm">
+          <div className="flex w-72 flex-col items-center gap-4 rounded-2xl bg-white p-8 shadow-2xl ring-1 ring-slate-200">
+            <Loader2 size={36} className="animate-spin text-sky-500" />
+            <div className="text-center">
+              <p className="text-sm font-bold text-slate-900">{loadingTask}</p>
+              <p className="mt-1 text-xs text-slate-400">Please wait…</p>
+            </div>
           </div>
         </div>
       )}
 
+      {/* Document preview modal */}
+      {previewRecord && (
+        <div
+          className="fixed inset-0 z-[300] flex items-center justify-center bg-slate-900/60 backdrop-blur-sm p-4"
+          onClick={() => setPreviewRecord(null)}
+        >
+          <div
+            className="relative flex flex-col w-full max-w-4xl max-h-[90vh] rounded-2xl bg-white shadow-2xl ring-1 ring-slate-200 overflow-hidden"
+            onClick={e => e.stopPropagation()}
+          >
+            <div className="flex items-center justify-between px-6 py-4 border-b border-slate-100 bg-slate-50">
+              <div>
+                <p className="text-sm font-bold text-slate-900 truncate max-w-[500px]">{previewRecord.title || 'Document Preview'}</p>
+                <p className="text-[10px] font-bold uppercase tracking-widest text-slate-400 mt-0.5">Full Preview</p>
+              </div>
+              <div className="flex items-center gap-2">
+                <a
+                  href={getDocumentUrl(previewRecord)}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="flex items-center gap-1.5 rounded-lg bg-sky-50 px-3 py-2 text-[11px] font-bold text-sky-700 ring-1 ring-sky-200 hover:bg-sky-500 hover:text-white transition-all"
+                >
+                  <ExternalLink size={13} /> Open in Tab
+                </a>
+                <button
+                  onClick={() => setPreviewRecord(null)}
+                  className="flex h-8 w-8 items-center justify-center rounded-lg bg-slate-100 text-slate-500 hover:bg-rose-50 hover:text-rose-600 transition-all"
+                >
+                  <X size={16} />
+                </button>
+              </div>
+            </div>
+            <div className="flex-1 bg-slate-100" style={{ minHeight: '60vh' }}>
+              {previewRecord.attachment_path?.match(/\.(jpeg|jpg|gif|png|webp)$/i) ? (
+                <div className="flex h-full items-center justify-center p-6">
+                  <img src={getDocumentUrl(previewRecord)} alt="Attachment" className="max-h-full max-w-full rounded-xl object-contain shadow-md" />
+                </div>
+              ) : (
+                <iframe
+                  src={`https://docs.google.com/gview?url=${encodeURIComponent(getDocumentUrl(previewRecord))}&embedded=true`}
+                  title="Document Preview"
+                  className="w-full h-full border-0"
+                  style={{ minHeight: '60vh' }}
+                />
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Toolbar */}
       <TableToolbar title={title} rows={exportRows} filters={filters} setFilters={setFilters} />
 
-      <div className="grid gap-6 lg:grid-cols-[1.3fr_0.9fr]">
-        <div className="rounded-2xl bg-white p-6 shadow-sm ring-1 ring-slate-200 sm:p-8">
-          <div className="mb-6 flex items-center justify-between border-b border-slate-100 pb-5">
+      {/* Role tabs (HOD: student/faculty | Admin: student/faculty/hod) */}
+      {roleTabs && (
+        <div className="flex gap-2 rounded-2xl bg-white p-1.5 shadow-sm ring-1 ring-slate-200 w-fit">
+          {roleTabs.map(tab => (
+            <button
+              key={tab.role}
+              onClick={() => switchRole(tab.role)}
+              className={`relative flex items-center gap-2 rounded-xl px-5 py-2.5 text-[13px] font-bold transition-all ${
+                activeRole === tab.role
+                  ? 'bg-gradient-to-r from-sky-600 to-indigo-600 text-white shadow-md'
+                  : 'text-slate-500 hover:text-slate-900'
+              }`}
+            >
+              {tab.icon && <tab.icon size={15} />}
+              {tab.label}
+              {countByRole[tab.role] > 0 && (
+                <span className={`ml-0.5 rounded-full px-1.5 py-0.5 text-[10px] font-black leading-none ${
+                  activeRole === tab.role ? 'bg-white/25 text-white' : 'bg-slate-100 text-slate-600'
+                }`}>
+                  {countByRole[tab.role]}
+                </span>
+              )}
+            </button>
+          ))}
+        </div>
+      )}
+
+      {/* Main two-column layout */}
+      <div className="grid gap-5 lg:grid-cols-[1.2fr_0.8fr]">
+        {/* Left — list */}
+        <div className="rounded-2xl bg-white shadow-sm ring-1 ring-slate-200 overflow-hidden">
+          <div className="flex items-center justify-between px-6 py-4 border-b border-slate-100">
             <div>
-              <h3 className="text-xl font-bold text-slate-900">{title}</h3>
-              <p className="mt-1 text-xs font-semibold uppercase tracking-widest text-slate-500">Active Institutional Workflows</p>
+              <h3 className="text-sm font-bold text-slate-900">
+                {roleTabs ? roleTabs.find(t => t.role === activeRole)?.label : title}
+              </h3>
+              <p className="text-[11px] text-slate-400 mt-0.5">
+                {filtered.length} submission{filtered.length !== 1 ? 's' : ''}
+              </p>
             </div>
-            <span className="inline-flex items-center justify-center rounded-lg bg-sky-50 px-3 py-1.5 text-[11px] font-bold uppercase tracking-wider text-sky-700 ring-1 ring-sky-500/20">
-              {filtered.length} Active Records
-            </span>
-          </div>
-
-          <div className="space-y-3">
-            {filtered.length ? filtered.map((item) => (
-              <div
-                key={item.id}
-                onClick={() => setSelected(item)}
-                className={`group relative overflow-hidden rounded-xl border p-4 text-left transition-all hover:shadow-sm cursor-pointer ${
-                  selected?.id === item.id 
-                    ? 'border-sky-500 bg-sky-50/30 shadow-sm ring-1 ring-inset ring-sky-500/50' 
-                    : 'border-slate-200 bg-white hover:border-slate-300'
-                }`}
-              >
-                <div className="relative z-10 flex flex-wrap items-start justify-between gap-4">
-                  <div className="flex-1">
-                    <p className={`text-[15px] font-bold ${selected?.id === item.id ? 'text-slate-900' : 'text-slate-700 group-hover:text-slate-900'} leading-tight`}>{item.record?.title || '-'}</p>
-                    <div className="mt-1.5 flex items-center gap-2 text-[11px] font-bold text-slate-500">
-                      <FileDigit size={12} className="text-slate-400"/>
-                      <span className="uppercase tracking-widest">{item.table_name.replace('_', ' ')}</span>
-                      <span className="text-slate-300">•</span>
-                      <span className="text-slate-600">{item.submitter?.full_name || item.submitter?.email || '-'}</span>
-                    </div>
-                  </div>
-                  <div className="flex-shrink-0">
-                    <StatusBadge status={item.status} />
-                  </div>
-                </div>
-
-                <div className="relative z-10 mt-4 flex flex-wrap items-center justify-between gap-4 border-t border-slate-100 pt-3">
-                  <div className="flex flex-wrap gap-2 text-[11px] font-bold uppercase tracking-wider">
-                    <span className="inline-flex items-center gap-1.5 rounded-md bg-white border border-slate-200 px-2 py-0.5 text-slate-500 shadow-sm">
-                      Year <span className="text-slate-900">{item.record?.year || '-'}</span>
-                    </span>
-                    <span className="inline-flex items-center gap-1.5 rounded-md bg-slate-100 border border-slate-200 px-2 py-0.5 text-slate-600 shadow-sm">
-                      Phase <span className="text-slate-900">{item.current_reviewer_role || 'completed'}</span>
-                    </span>
-                  </div>
-
-                  {canReview && (
-                    <div className="flex gap-2">
-                      <button
-                        onClick={(e) => { e.stopPropagation(); approve(item); }}
-                        className="inline-flex items-center gap-1.5 rounded-lg bg-emerald-50 px-3 py-1.5 text-[11px] font-bold uppercase tracking-wider text-emerald-700 ring-1 ring-inset ring-emerald-500/30 transition-all hover:bg-emerald-500 hover:text-white"
-                      >
-                        <CheckCircle2 size={14} /> Approve
-                      </button>
-                      <button
-                        onClick={(e) => { e.stopPropagation(); reject(item); }}
-                        className="inline-flex items-center gap-1.5 rounded-lg bg-rose-50 px-3 py-1.5 text-[11px] font-bold uppercase tracking-wider text-rose-700 ring-1 ring-inset ring-rose-500/30 transition-all hover:bg-rose-500 hover:text-white"
-                      >
-                        <XCircle size={14} /> Reject
-                      </button>
-                    </div>
-                  )}
-                </div>
-              </div>
-            )) : (
-              <div className="flex flex-col items-center justify-center rounded-xl border border-dashed border-slate-300 bg-slate-50 py-12 text-center">
-                <div className="mb-3 rounded-lg bg-white shadow-sm ring-1 ring-slate-200 p-3">
-                  <FileDigit size={20} className="text-slate-400" />
-                </div>
-                <p className="text-sm font-bold text-slate-900">No submissions located.</p>
-                <p className="text-xs font-semibold text-slate-500 mt-1 max-w-[250px]">Adjust search parameters or establish a new institutional record.</p>
-              </div>
+            {filtered.length > 0 && (
+              <span className="rounded-lg bg-sky-50 px-3 py-1.5 text-[11px] font-bold text-sky-700 ring-1 ring-sky-200">
+                {filtered.filter(s => s.current_reviewer_role).length} pending
+              </span>
             )}
+          </div>
+          <div className="p-4 overflow-y-auto max-h-[calc(100vh-280px)]">
+            <SubmissionList
+              items={filtered}
+              selected={selected}
+              setSelected={setSelected}
+              canReview={canReview}
+              onApprove={handleApprove}
+              onReject={handleReject}
+              getDocumentUrl={getDocumentUrl}
+              setPreviewRecord={setPreviewRecord}
+            />
           </div>
         </div>
 
-        <div className="flex flex-col gap-4">
-          {selected ? (
-            <>
-              <div className="flex rounded-xl bg-white p-1.5 shadow-sm ring-1 ring-slate-200">
-                 <button 
-                  onClick={() => setRightTab('details')}
-                  className={`flex-1 rounded-lg py-2 text-xs font-bold transition-all ${rightTab === 'details' ? 'bg-slate-900 text-white shadow-md' : 'text-slate-500 hover:text-slate-900'}`}
-                 >
-                   Information Preview
-                 </button>
-                 <button 
-                  onClick={() => setRightTab('timeline')}
-                  className={`flex-1 rounded-lg py-2 text-xs font-bold transition-all ${rightTab === 'timeline' ? 'bg-slate-900 text-white shadow-md' : 'text-slate-500 hover:text-slate-900'}`}
-                 >
-                   Approval Timeline
-                 </button>
-              </div>
-
-              {rightTab === 'details' && (
-                <div className="rounded-2xl bg-white p-6 shadow-sm ring-1 ring-slate-200 flex flex-col h-full animate-fade-in">
-                   <div className="mb-6 flex items-center gap-3 border-b border-slate-100 pb-4">
-                      <Info size={18} className="text-sky-500" />
-                      <h4 className="text-lg font-bold text-slate-900">Record Data</h4>
-                   </div>
-
-                   <div className="flex-1 overflow-y-auto special-scrollbar space-y-6 pr-2">
-                      {selected.record?.data && Object.keys(selected.record.data).length > 0 ? (
-                        <div className="grid grid-cols-2 gap-y-5 gap-x-4">
-                          {Object.entries(selected.record.data).map(([key, value]) => (
-                            <div key={key} className="col-span-2 sm:col-span-1">
-                              <p className="text-[10px] font-bold uppercase tracking-widest text-slate-400 mb-1">{key.replace(/_/g, ' ')}</p>
-                              <p className="text-sm font-semibold text-slate-900 break-words">{value || '-'}</p>
-                            </div>
-                          ))}
-                        </div>
-                      ) : (
-                        <p className="text-xs font-semibold text-slate-500 italic">No dynamic form data attached.</p>
-                      )}
-
-                      <div className="pt-6 border-t border-slate-100">
-                         <h4 className="text-[11px] font-bold uppercase tracking-widest text-slate-500 mb-4 flex items-center gap-2">
-                           <Eye size={14} /> Document Preview
-                         </h4>
-                         
-                         {getDocumentUrl(selected.record) ? (
-                            <div className="rounded-xl overflow-hidden border border-slate-200 bg-slate-50 flex flex-col items-center group">
-                               <div className="w-full h-[300px] flex items-center justify-center bg-slate-100 relative">
-                                  {selected.record?.attachment_path?.match(/\.(jpeg|jpg|gif|png)$/i) ? (
-                                     <img src={getDocumentUrl(selected.record)} alt="Attachment" className="object-contain w-full h-full" />
-                                  ) : (
-                                     <iframe src={`https://docs.google.com/gview?url=${encodeURIComponent(getDocumentUrl(selected.record))}&embedded=true`} title="Document Preview" className="w-full h-full bg-white text-xs border-0" />
-                                  )}
-                               </div>
-                               <a 
-                                 href={getDocumentUrl(selected.record)} 
-                                 target="_blank" 
-                                 rel="noreferrer"
-                                 className="w-full flex items-center justify-center gap-2 py-3 bg-white text-sm font-bold text-slate-700 hover:text-sky-600 transition-colors border-t border-slate-200"
-                               >
-                                 <Download size={14} /> Open Full Document
-                               </a>
-                            </div>
-                         ) : (
-                            <div className="rounded-xl border border-dashed border-slate-300 bg-slate-50 p-6 text-center">
-                               <FileDigit size={20} className="mx-auto text-slate-300 mb-2" />
-                               <p className="text-xs font-bold text-slate-500">No Document Attached</p>
-                            </div>
-                         )}
-                      </div>
-                   </div>
-                </div>
-              )}
-
-              {rightTab === 'timeline' && (
-                <div className="animate-fade-in w-full h-full">
-                  <Timeline logs={selected?.logs || []} />
-                </div>
-              )}
-            </>
-          ) : (
-            <div className="flex flex-col items-center justify-center rounded-2xl border border-dashed border-slate-300 bg-slate-50/50 py-20 text-center h-full">
-               <Info size={24} className="text-slate-300 mb-3" />
-               <p className="text-sm font-bold text-slate-900">No Selection Made</p>
-               <p className="text-xs font-semibold text-slate-500 mt-1 max-w-[200px]">Click on a record from the list to view its information preview and approval timeline.</p>
-            </div>
-          )}
+        {/* Right — detail */}
+        <div className="min-h-[400px]">
+          <DetailPanel
+            selected={selected}
+            getDocumentUrl={getDocumentUrl}
+            setPreviewRecord={setPreviewRecord}
+          />
         </div>
       </div>
     </div>

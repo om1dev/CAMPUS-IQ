@@ -1,5 +1,42 @@
-import { LogOut, User, LayoutDashboard, Send, FileText, Users, PieChart, PenTool } from 'lucide-react';
+import { useEffect, useState } from 'react';
+import { LogOut, User, Clock } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
+
+function ISTClock() {
+  const [time, setTime] = useState('');
+
+  useEffect(() => {
+    function tick() {
+      setTime(new Date().toLocaleTimeString('en-IN', {
+        timeZone: 'Asia/Kolkata',
+        hour: '2-digit',
+        minute: '2-digit',
+        second: '2-digit',
+        hour12: true
+      }));
+    }
+    tick();
+    const id = setInterval(tick, 1000);
+    return () => clearInterval(id);
+  }, []);
+
+  const date = new Date().toLocaleDateString('en-IN', {
+    timeZone: 'Asia/Kolkata',
+    weekday: 'short',
+    day: 'numeric',
+    month: 'short'
+  });
+
+  return (
+    <div className="flex items-center gap-2.5 rounded-xl bg-white px-4 py-2.5 shadow-sm ring-1 ring-slate-200/60">
+      <Clock size={14} className="text-sky-500 flex-shrink-0" />
+      <div className="flex flex-col leading-none">
+        <span className="text-[13px] font-black tracking-tight text-slate-900 tabular-nums">{time}</span>
+        <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 mt-0.5">{date} · IST</span>
+      </div>
+    </div>
+  );
+}
 
 const navMap = {
   student: 'Student Intelligence',
@@ -90,9 +127,7 @@ export default function AppLayout({ title, sidebarItems = [], activeTab = '', on
            </div>
            
            <div className="hidden items-center gap-4 md:flex">
-              <div className="flex h-10 items-center justify-center rounded-xl bg-white px-4 text-[11px] font-bold uppercase tracking-wider text-sky-600 shadow-sm ring-1 ring-slate-200/60">
-                 System Active • Enforcing Workflows
-              </div>
+              <ISTClock />
            </div>
         </header>
 
