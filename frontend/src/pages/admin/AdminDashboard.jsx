@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import toast from 'react-hot-toast';
 import {
   BarChart2, PenTool, ShieldCheck,
-  CheckCircle2, Clock, XCircle, TrendingUp,
+  CheckCircle2, Clock, XCircle,
   ChevronRight, Users, GraduationCap, UserCog,
   UserCheck, ArrowUpRight, FileText, Activity
 } from 'lucide-react';
@@ -12,15 +12,21 @@ import SubmissionPanel from '../../components/SubmissionPanel';
 import AnalyticsCards from '../../components/AnalyticsCards';
 import StatusBadge from '../../components/StatusBadge';
 import SuccessPopup from '../../components/SuccessPopup';
+import ReviewHistoryCards from '../../components/ReviewHistoryCards';
 import { RD_TABLES } from '../../lib/tableConfig';
 import { createRecord } from '../../services/recordService';
 import { getAnalytics } from '../../services/analyticsService';
-import { approveSubmission, getSubmissions, rejectSubmission } from '../../services/submissionService';
+import {
+  approveSubmission,
+  getSubmissions,
+  rejectSubmission,
+  getReviewHistorySummary
+} from '../../services/submissionService';
 
 const sidebarItems = [
   { id: 'overview',  label: 'Overview',        icon: BarChart2 },
-  { id: 'approvals', label: 'Final Approvals',  icon: ShieldCheck },
-  { id: 'new',       label: 'Create Record',    icon: PenTool },
+  { id: 'approvals', label: 'Final Approvals', icon: ShieldCheck },
+  { id: 'new',       label: 'Create Record',   icon: PenTool },
 ];
 
 const ADMIN_ROLE_TABS = [
@@ -38,41 +44,65 @@ const ROLE_COLOR = {
 };
 
 export default function AdminDashboard() {
-  const [activeTab,   setActiveTab]   = useState('overview');
-  const [tableName,   setTableName]   = useState('awards');
-  const [analytics,   setAnalytics]   = useState(null);
+  const [activeTab, setActiveTab] = useState('overview');
+  const [tableName, setTableName] = useState('awards');
+  const [analytics, setAnalytics] = useState(null);
   const [submissions, setSubmissions] = useState([]);
-  const [popup,       setPopup]       = useState(null);
+  const [reviewSummary, setReviewSummary] = useState(null);
+  const [popup, setPopup] = useState(null);
 
   const currentTable = useMemo(() => RD_TABLES[tableName], [tableName]);
 
-  const pendingAdmin  = useMemo(() => submissions.filter(s => s.current_reviewer_role === 'admin'), [submissions]);
-  const approved      = useMemo(() => submissions.filter(s => s.status === 'approved').length, [submissions]);
-  const rejected      = useMemo(() => submissions.filter(s => s.status === 'rejected').length, [submissions]);
-  const totalPending  = useMemo(() => submissions.filter(s => s.status?.startsWith('pending')).length, [submissions]);
+  const pendingAdmin = useMemo(
+    () => submissions.filter((s) => s.current_reviewer_role === 'admin'),
+    [submissions]
+  );
 
-  // Per-role counts for the role breakdown strip
+  const approved = useMemo(
+    () => submissions.filter((s) => s.status === 'approved').length,
+    [submissions]
+  );
+
+  const rejected = useMemo(
+    () => submissions.filter((s) => s.status === 'rejected').length,
+    [submissions]
+  );
+
+  const totalPending = useMemo(
+    () => submissions.filter((s) => s.status?.startsWith('pending')).length,
+    [submissions]
+  );
+
   const byRole = useMemo(() => ({
-    student: submissions.filter(s => s.submitter_role === 'student').length,
-    faculty: submissions.filter(s => s.submitter_role === 'faculty').length,
-    hod:     submissions.filter(s => s.submitter_role === 'hod').length,
+    student: submissions.filter((s) => s.submitter_role === 'student').length,
+    faculty: submissions.filter((s) => s.submitter_role === 'faculty').length,
+    hod: submissions.filter((s) => s.submitter_role === 'hod').length,
   }), [submissions]);
 
   async function load() {
     try {
-      const [aRes, sRes] = await Promise.all([getAnalytics(), getSubmissions()]);
+      const [aRes, sRes, summaryRes] = await Promise.all([
+        getAnalytics(),
+        getSubmissions(),
+        getReviewHistorySummary(),
+      ]);
+
       setAnalytics(aRes.analytics);
       setSubmissions(sRes.submissions || []);
+      setReviewSummary(summaryRes.summary || null);
     } catch {
       toast.error('Failed to load data');
     }
   }
 
-  useEffect(() => { load(); }, []);
+  useEffect(() => {
+    load();
+  }, []);
 
   async function saveDraft(values) {
     const res = await createRecord(tableName, values);
     await load();
+
     setPopup({
       type: 'created',
       title: 'Record Created',
@@ -86,12 +116,8 @@ export default function AdminDashboard() {
 
   return (
     <AppLayout title="Admin Dashboard" sidebarItems={sidebarItems} activeTab={activeTab} onTabChange={setActiveTab}>
-
-      {/* ── OVERVIEW ── */}
       {activeTab === 'overview' && (
         <div className="space-y-6">
-
-          {/* ── Row 1: KPI cards ── */}
           <div className="grid grid-cols-2 gap-4 xl:grid-cols-4">
             {[
               {
@@ -144,15 +170,15 @@ export default function AdminDashboard() {
             ))}
           </div>
 
-          {/* ── Row 2: Role breakdown + pipeline progress ── */}
-          <div className="grid gap-5 lg:grid-cols-[1fr_1fr]">
+          <ReviewHistoryCards summary={reviewSummary} title="Admin Clearing History" />
 
-            {/* Role breakdown */}
+          <div className="grid gap-5 lg:grid-cols-[1fr_1fr]">
             <div className="rounded-2xl bg-white shadow-sm ring-1 ring-slate-200 overflow-hidden">
               <div className="px-6 py-4 border-b border-slate-100">
                 <h3 className="text-sm font-bold text-slate-900">Submissions by Role</h3>
                 <p className="text-[11px] text-slate-400 mt-0.5">Breakdown across all submitter types</p>
               </div>
+
               <div className="p-6 space-y-4">
                 {[
                   { role: 'student', label: 'Students',        color: 'bg-sky-500',    light: 'bg-sky-50',    text: 'text-sky-700' },
@@ -160,7 +186,8 @@ export default function AdminDashboard() {
                   { role: 'hod',     label: 'HOD',             color: 'bg-violet-500', light: 'bg-violet-50', text: 'text-violet-700' },
                 ].map(({ role, label, color, light, text }) => {
                   const count = byRole[role];
-                  const pct   = submissions.length ? Math.round((count / submissions.length) * 100) : 0;
+                  const pct = submissions.length ? Math.round((count / submissions.length) * 100) : 0;
+
                   return (
                     <div key={role}>
                       <div className="flex items-center justify-between mb-1.5">
@@ -168,11 +195,15 @@ export default function AdminDashboard() {
                           <span className={`inline-block h-2 w-2 rounded-full ${color}`} />
                           <span className="text-xs font-semibold text-slate-700">{label}</span>
                         </div>
+
                         <div className="flex items-center gap-2">
-                          <span className={`rounded-md px-2 py-0.5 text-[11px] font-bold ring-1 ${light} ${text} ring-current/20`}>{count}</span>
+                          <span className={`rounded-md px-2 py-0.5 text-[11px] font-bold ring-1 ${light} ${text} ring-current/20`}>
+                            {count}
+                          </span>
                           <span className="text-[11px] font-semibold text-slate-400">{pct}%</span>
                         </div>
                       </div>
+
                       <div className="h-2 w-full rounded-full bg-slate-100 overflow-hidden">
                         <div
                           className={`h-full rounded-full transition-all duration-700 ${color}`}
@@ -185,18 +216,18 @@ export default function AdminDashboard() {
               </div>
             </div>
 
-            {/* Pipeline progress */}
             <div className="rounded-2xl bg-white shadow-sm ring-1 ring-slate-200 overflow-hidden">
               <div className="px-6 py-4 border-b border-slate-100">
                 <h3 className="text-sm font-bold text-slate-900">Approval Pipeline</h3>
                 <p className="text-[11px] text-slate-400 mt-0.5">Current stage distribution</p>
               </div>
+
               <div className="p-6 grid grid-cols-2 gap-4">
                 {[
-                  { label: 'At Faculty',  value: submissions.filter(s => s.current_reviewer_role === 'faculty').length, color: 'bg-amber-400',   ring: 'ring-amber-200',   bg: 'bg-amber-50',   text: 'text-amber-700' },
-                  { label: 'At HOD',      value: submissions.filter(s => s.current_reviewer_role === 'hod').length,     color: 'bg-sky-400',     ring: 'ring-sky-200',     bg: 'bg-sky-50',     text: 'text-sky-700' },
-                  { label: 'At Admin',    value: pendingAdmin.length,                                                    color: 'bg-violet-400',  ring: 'ring-violet-200',  bg: 'bg-violet-50',  text: 'text-violet-700' },
-                  { label: 'In Review',   value: totalPending,                                                           color: 'bg-indigo-400',  ring: 'ring-indigo-200',  bg: 'bg-indigo-50',  text: 'text-indigo-700' },
+                  { label: 'At Faculty', value: submissions.filter((s) => s.current_reviewer_role === 'faculty').length, color: 'bg-amber-400',  ring: 'ring-amber-200',  bg: 'bg-amber-50',  text: 'text-amber-700' },
+                  { label: 'At HOD',     value: submissions.filter((s) => s.current_reviewer_role === 'hod').length,     color: 'bg-sky-400',    ring: 'ring-sky-200',    bg: 'bg-sky-50',    text: 'text-sky-700' },
+                  { label: 'At Admin',   value: pendingAdmin.length,                                                    color: 'bg-violet-400', ring: 'ring-violet-200', bg: 'bg-violet-50', text: 'text-violet-700' },
+                  { label: 'In Review',  value: totalPending,                                                           color: 'bg-indigo-400', ring: 'ring-indigo-200', bg: 'bg-indigo-50', text: 'text-indigo-700' },
                 ].map(({ label, value, color, ring, bg, text }) => (
                   <div key={label} className={`flex flex-col gap-2 rounded-xl p-4 ring-1 ${bg} ${ring}`}>
                     <div className={`flex h-8 w-8 items-center justify-center rounded-lg ${color} bg-opacity-20`}>
@@ -210,19 +241,16 @@ export default function AdminDashboard() {
             </div>
           </div>
 
-          {/* ── Row 3: Charts ── */}
           <AnalyticsCards analytics={analytics} />
 
-          {/* ── Row 4: Two-column bottom section ── */}
           <div className="grid gap-5 lg:grid-cols-[1fr_1fr]">
-
-            {/* Pending final approvals */}
             <div className="rounded-2xl bg-white shadow-sm ring-1 ring-slate-200 overflow-hidden">
               <div className="flex items-center justify-between px-6 py-4 border-b border-slate-100">
                 <div>
                   <h3 className="text-sm font-bold text-slate-900">Pending Final Approval</h3>
                   <p className="text-[11px] text-slate-400 mt-0.5">Submissions awaiting your decision</p>
                 </div>
+
                 {pendingAdmin.length > 0 && (
                   <button
                     onClick={() => setActiveTab('approvals')}
@@ -232,19 +260,22 @@ export default function AdminDashboard() {
                   </button>
                 )}
               </div>
+
               {pendingAdmin.length > 0 ? (
                 <ul className="divide-y divide-slate-100">
-                  {pendingAdmin.slice(0, 5).map(s => (
+                  {pendingAdmin.slice(0, 5).map((s) => (
                     <li key={s.id} className="flex items-center gap-4 px-6 py-3.5 hover:bg-slate-50 transition-colors">
                       <div className="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-xl bg-amber-50 text-amber-600">
                         <Clock size={15} />
                       </div>
+
                       <div className="min-w-0 flex-1">
                         <p className="text-sm font-semibold text-slate-900 truncate">{s.record?.title || '—'}</p>
                         <p className="text-[11px] text-slate-400 mt-0.5 capitalize">
                           {s.submitter_role} · {s.submitter?.full_name || s.submitter?.email || '—'}
                         </p>
                       </div>
+
                       <StatusBadge status={s.status} />
                     </li>
                   ))}
@@ -260,13 +291,13 @@ export default function AdminDashboard() {
               )}
             </div>
 
-            {/* Recent submissions table */}
             <div className="rounded-2xl bg-white shadow-sm ring-1 ring-slate-200 overflow-hidden">
               <div className="flex items-center justify-between px-6 py-4 border-b border-slate-100">
                 <div>
                   <h3 className="text-sm font-bold text-slate-900">Recent Submissions</h3>
                   <p className="text-[11px] text-slate-400 mt-0.5">Latest activity across all roles</p>
                 </div>
+
                 <button
                   onClick={() => setActiveTab('approvals')}
                   className="flex items-center gap-1 text-[11px] font-bold text-sky-600 hover:text-sky-700"
@@ -274,17 +305,20 @@ export default function AdminDashboard() {
                   View all <ChevronRight size={13} />
                 </button>
               </div>
+
               {submissions.length > 0 ? (
                 <ul className="divide-y divide-slate-100">
-                  {submissions.slice(0, 6).map(s => (
+                  {submissions.slice(0, 6).map((s) => (
                     <li key={s.id} className="flex items-center gap-3 px-6 py-3 hover:bg-slate-50 transition-colors">
                       <span className={`flex-shrink-0 rounded-md px-2 py-0.5 text-[10px] font-black uppercase tracking-wide ring-1 ${ROLE_COLOR[s.submitter_role] || 'bg-slate-100 text-slate-600 ring-slate-200'}`}>
                         {s.submitter_role}
                       </span>
+
                       <div className="min-w-0 flex-1">
                         <p className="text-xs font-semibold text-slate-900 truncate">{s.record?.title || '—'}</p>
                         <p className="text-[10px] text-slate-400 truncate capitalize">{s.table_name?.replace(/_/g, ' ')}</p>
                       </div>
+
                       <StatusBadge status={s.status} />
                     </li>
                   ))}
@@ -297,29 +331,36 @@ export default function AdminDashboard() {
               )}
             </div>
           </div>
-
         </div>
       )}
 
-      {/* ── FINAL APPROVALS ── */}
       {activeTab === 'approvals' && (
-        <SubmissionPanel
-          title="Final Approval Queue"
-          submissions={submissions}
-          canReview
-          roleTabs={ADMIN_ROLE_TABS}
-          onApprove={async (id, r) => { await approveSubmission(id, r); await load(); }}
-          onReject={async (id, r)  => { await rejectSubmission(id, r);  await load(); }}
-        />
+        <div className="space-y-6">
+          <ReviewHistoryCards summary={reviewSummary} title="Admin Clearing History" />
+
+          <SubmissionPanel
+            title="Final Approval Queue"
+            submissions={submissions}
+            canReview
+            roleTabs={ADMIN_ROLE_TABS}
+            onApprove={async (id, r) => {
+              await approveSubmission(id, r);
+              await load();
+            }}
+            onReject={async (id, r) => {
+              await rejectSubmission(id, r);
+              await load();
+            }}
+          />
+        </div>
       )}
 
-      {/* ── CREATE RECORD ── */}
       {activeTab === 'new' && (
         <div className="space-y-5 max-w-3xl">
           <div className="rounded-2xl bg-white shadow-sm ring-1 ring-slate-200 p-1.5 w-fit">
             <select
               value={tableName}
-              onChange={e => setTableName(e.target.value)}
+              onChange={(e) => setTableName(e.target.value)}
               className="appearance-none bg-transparent pl-4 pr-10 py-2.5 text-sm font-bold text-sky-600 focus:outline-none cursor-pointer"
             >
               {Object.entries(RD_TABLES).map(([k, v]) => (
@@ -327,6 +368,7 @@ export default function AdminDashboard() {
               ))}
             </select>
           </div>
+
           <DynamicForm tableName={tableName} tableConfig={currentTable} onSave={saveDraft} />
         </div>
       )}
@@ -340,7 +382,6 @@ export default function AdminDashboard() {
         onAction={popup?.onAction}
         onClose={() => setPopup(null)}
       />
-
     </AppLayout>
   );
 }
