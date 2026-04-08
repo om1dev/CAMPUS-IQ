@@ -25,10 +25,16 @@ async function reject(req, res) {
   return res.json({ success: true, message: 'Submission rejected', submission: data });
 }
 
+async function reviewHistorySummary(req, res) {
+  const data = await submissionService.getReviewHistorySummary(req.user);
+  return res.json({ success: true, summary: data });
+}
+
 module.exports = {
   submit,
   list,
   getById,
   approve,
-  reject
+  reject,
+  reviewHistorySummary,
 };

@@ -11,6 +11,7 @@ router.use(requireAuth, departmentScope);
 
 router.post('/submit/:tableName', allowRoles('student', 'faculty', 'hod', 'admin', 'superadmin'), asyncHandler(ctrl.submit));
 router.get('/', asyncHandler(ctrl.list));
+router.get('/review-history/summary', allowRoles('faculty', 'hod', 'admin', 'superadmin'), asyncHandler(ctrl.reviewHistorySummary));
 router.get('/:id', asyncHandler(ctrl.getById));
 router.post('/approve/:id', allowRoles('faculty', 'hod', 'admin', 'superadmin'), asyncHandler(ctrl.approve));
 router.post('/reject/:id', allowRoles('faculty', 'hod', 'admin', 'superadmin'), asyncHandler(ctrl.reject));
