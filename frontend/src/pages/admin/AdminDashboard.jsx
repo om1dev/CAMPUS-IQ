@@ -12,20 +12,17 @@ import SubmissionPanel from '../../components/SubmissionPanel';
 import AnalyticsCards from '../../components/AnalyticsCards';
 import StatusBadge from '../../components/StatusBadge';
 import SuccessPopup from '../../components/SuccessPopup';
-import ReviewHistoryCards from '../../components/ReviewHistoryCards';
+import UserRoster from '../../components/UserRoster';
 import { RD_TABLES } from '../../lib/tableConfig';
 import { createRecord } from '../../services/recordService';
 import { getAnalytics } from '../../services/analyticsService';
-import {
-  approveSubmission,
-  getSubmissions,
-  rejectSubmission,
-  getReviewHistorySummary
-} from '../../services/submissionService';
+import { approveSubmission, getSubmissions, rejectSubmission } from '../../services/submissionService';
+import { addStudent, addFaculty, addHod, getUsers } from '../../services/userService';
 
 const sidebarItems = [
-  { id: 'overview',  label: 'Overview',        icon: BarChart2 },
+  { id: 'overview',  label: 'Overview',       icon: BarChart2 },
   { id: 'approvals', label: 'Final Approvals', icon: ShieldCheck },
+  { id: 'users',     label: 'Manage Users',    icon: Users },
   { id: 'new',       label: 'Create Record',   icon: PenTool },
 ];
 
@@ -33,6 +30,25 @@ const ADMIN_ROLE_TABS = [
   { role: 'student', label: 'Students', icon: GraduationCap },
   { role: 'faculty', label: 'Faculty',  icon: UserCog },
   { role: 'hod',     label: 'HOD',      icon: UserCheck },
+];
+
+const STUDENT_FIELDS = [
+  { name: 'full_name', label: 'Full Name',        placeholder: 'Student full name',       fullWidth: true },
+  { name: 'email',     label: 'Email',            type: 'email', placeholder: 'student@university.edu', fullWidth: true },
+  { name: 'year',      label: 'Academic Year',    type: 'number', placeholder: 'e.g. 2024' },
+  { name: 'password',  label: 'Default Password', defaultValue: 'Student@123' },
+];
+
+const FACULTY_FIELDS = [
+  { name: 'full_name', label: 'Full Name',        placeholder: 'Faculty full name',       fullWidth: true },
+  { name: 'email',     label: 'Email',            type: 'email', placeholder: 'faculty@university.edu', fullWidth: true },
+  { name: 'password',  label: 'Default Password', defaultValue: 'Faculty@123',            fullWidth: true },
+];
+
+const HOD_FIELDS = [
+  { name: 'full_name', label: 'Full Name',        placeholder: 'HOD full name',           fullWidth: true },
+  { name: 'email',     label: 'Email',            type: 'email', placeholder: 'hod@university.edu',     fullWidth: true },
+  { name: 'password',  label: 'Default Password', defaultValue: 'Hod@123',                fullWidth: true },
 ];
 
 const ROLE_COLOR = {

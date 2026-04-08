@@ -14,6 +14,7 @@ import SuccessPopup from '../../components/SuccessPopup';
 import { RD_TABLES } from '../../lib/tableConfig';
 import { createRecord, getRecords } from '../../services/recordService';
 import { getSubmissions, submitRecord } from '../../services/submissionService';
+import { useNotifications } from '../../hooks/useNotifications';
 
 const sidebarItems = [
   { id: 'overview',  label: 'Overview',    icon: BarChart2 },
@@ -39,6 +40,8 @@ export default function StudentDashboard() {
   const [loadingTask,  setLoadingTask]  = useState(null);
   const [popup,        setPopup]        = useState(null); // { type, title, message, meta, onAction }
 
+  const notifications = useNotifications(submissions);
+
   const currentTable = useMemo(() => RD_TABLES[tableName], [tableName]);
 
   async function load() {
@@ -60,20 +63,46 @@ export default function StudentDashboard() {
     setPopup({
       type: 'draft',
       title: 'Draft Saved',
-      message: 'Your record has been saved locally. Submit it when ready to enter the approval workflow.',
+      message: 'Your record has been saved locally. Go to My Drafts to submit it.',
       meta: [
         { label: 'Title', value: res?.record?.title || values?.title || 'Record' },
         { label: 'Type',  value: RD_TABLES[tableName]?.label || tableName },
       ],
-      onAction: { label: 'Submit Now', fn: () => {} },
+      onAction: { label: 'View Drafts', fn: () => setActiveTab('drafts') },
     });
   }
 
+  async function submitDirect(values) {
+    setLoadingTask('Submitting for review…');
+    try {
+      const res = await createRecord(tableName, values);
+      await submitRecord(tableName, { recordId: res.record.id, remarks: 'Student submission' });
+      // No deleteRecord needed — markRecordSubmitted sets is_submitted:true
+      // so it won't appear in drafts (drafts only shows is_submitted:false)
+      setActiveTab('workflows');
+      await load();
+      setPopup({
+        type: 'submit',
+        title: 'Submitted Successfully',
+        message: 'Your record has been routed to your assigned faculty for review.',
+        meta: [
+          { label: 'Record', value: res?.record?.title || values?.title || 'Record' },
+          { label: 'Next',   value: 'Faculty Review' },
+        ],
+        onAction: { label: 'View Submissions', fn: () => setActiveTab('workflows') },
+      });
+    } catch {
+      toast.error('Submission failed');
+    } finally {
+      setLoadingTask(null);
+    }
+  }
+
   async function routeRecord(record) {
-    if (!window.confirm(`Submit "${record.title}" for faculty review?`)) return;
     setLoadingTask('Submitting for review…');
     try {
       await submitRecord(tableName, { recordId: record.id, remarks: 'Student submission' });
+      // markRecordSubmitted sets is_submitted:true — record disappears from drafts automatically
       setActiveTab('workflows');
       await load();
       setPopup({
@@ -94,16 +123,19 @@ export default function StudentDashboard() {
     }
   }
 
+  // Only unsubmitted records appear in drafts
+  const draftRecords = useMemo(() => records.filter(r => !r.is_submitted), [records]);
+
   // Derived stats
-  const approved  = useMemo(() => submissions.filter(s => s.status === 'approved').length,              [submissions]);
-  const pending   = useMemo(() => submissions.filter(s => s.status?.startsWith('pending')).length,      [submissions]);
-  const rejected  = useMemo(() => submissions.filter(s => s.status === 'rejected').length,              [submissions]);
+  const approved  = useMemo(() => submissions.filter(s => s.status === 'approved').length,               [submissions]);
+  const pending   = useMemo(() => submissions.filter(s => s.status?.startsWith('pending')).length,       [submissions]);
+  const rejected  = useMemo(() => submissions.filter(s => s.status === 'rejected').length,               [submissions]);
   const atFaculty = useMemo(() => submissions.filter(s => s.current_reviewer_role === 'faculty').length, [submissions]);
   const atHod     = useMemo(() => submissions.filter(s => s.current_reviewer_role === 'hod').length,     [submissions]);
   const atAdmin   = useMemo(() => submissions.filter(s => s.current_reviewer_role === 'admin').length,   [submissions]);
 
   return (
-    <AppLayout title="Student Dashboard" sidebarItems={sidebarItems} activeTab={activeTab} onTabChange={setActiveTab}>
+    <AppLayout title="Student Dashboard" sidebarItems={sidebarItems} activeTab={activeTab} onTabChange={setActiveTab} notifications={notifications}>
 
       {loadingTask && (
         <div className="fixed inset-0 z-[200] flex items-center justify-center bg-slate-900/40 backdrop-blur-sm">
@@ -126,7 +158,7 @@ export default function StudentDashboard() {
             {[
               {
                 label: 'Total Drafts',
-                value: records.length,
+                value: draftRecords.length,
                 sub: 'Saved locally',
                 icon: BookOpen,
                 iconBg: 'bg-sky-50', iconColor: 'text-sky-600',
@@ -358,7 +390,7 @@ export default function StudentDashboard() {
               ))}
             </select>
           </div>
-          <DynamicForm tableName={tableName} tableConfig={currentTable} onSave={saveDraft} />
+          <DynamicForm tableName={tableName} tableConfig={currentTable} onSave={saveDraft} onSubmitDirect={submitDirect} />
         </div>
       )}
 
@@ -370,12 +402,12 @@ export default function StudentDashboard() {
               <h2 className="text-base font-bold text-slate-900">My Drafts</h2>
               <p className="text-xs text-slate-400 mt-0.5">Records saved locally, not yet submitted</p>
             </div>
-            <span className="rounded-lg bg-slate-100 px-3 py-1.5 text-xs font-bold text-slate-600">{records.length} records</span>
+            <span className="rounded-lg bg-slate-100 px-3 py-1.5 text-xs font-bold text-slate-600">{draftRecords.length} records</span>
           </div>
 
-          {records.length ? (
+          {draftRecords.length ? (
             <ul className="divide-y divide-slate-100">
-              {records.map(record => (
+              {draftRecords.map(record => (
                 <li key={record.id} className="group flex items-center justify-between gap-4 px-6 py-4 hover:bg-slate-50 transition-colors">
                   <div className="flex items-center gap-4 min-w-0">
                     <div className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-xl bg-slate-100 text-slate-400 group-hover:bg-sky-50 group-hover:text-sky-500 transition-colors">

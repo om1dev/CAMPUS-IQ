@@ -56,9 +56,22 @@ async function listAssignedStudents(facultyId) {
   return listUsers({ role: 'student', assigned_faculty_id: facultyId });
 }
 
+async function deleteUserById(id) {
+  const { error: authError } = await adminClient.auth.admin.deleteUser(id);
+  if (authError) throw new ApiError(400, authError.message);
+
+  const { error: profileError } = await adminClient
+    .from('profiles')
+    .delete()
+    .eq('id', id);
+
+  if (profileError) throw new ApiError(400, profileError.message);
+}
+
 module.exports = {
   createProfile,
   getProfileById,
   listUsers,
-  listAssignedStudents
+  listAssignedStudents,
+  deleteUserById
 };

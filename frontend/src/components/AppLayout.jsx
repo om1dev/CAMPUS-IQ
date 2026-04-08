@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { LogOut, User, Clock } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
+import NotificationPanel from './NotificationPanel';
 
 function ISTClock() {
   const [time, setTime] = useState('');
@@ -46,7 +47,7 @@ const navMap = {
   superadmin: 'Superadmin Console'
 };
 
-export default function AppLayout({ title, sidebarItems = [], activeTab = '', onTabChange, children }) {
+export default function AppLayout({ title, sidebarItems = [], activeTab = '', onTabChange, notifications = [], children }) {
   const { profile, logout } = useAuth();
 
   return (
@@ -126,7 +127,8 @@ export default function AppLayout({ title, sidebarItems = [], activeTab = '', on
               <h2 className="text-2xl font-black tracking-tight text-slate-900">{sidebarItems.find(i => i.id === activeTab)?.label || title}</h2>
            </div>
            
-           <div className="hidden items-center gap-4 md:flex">
+           <div className="hidden items-center gap-3 md:flex">
+              <NotificationPanel notifications={notifications} />
               <ISTClock />
            </div>
         </header>

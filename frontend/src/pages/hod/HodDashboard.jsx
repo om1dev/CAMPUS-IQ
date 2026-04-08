@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import toast from 'react-hot-toast';
 import {
-  Users, BarChart2, Inbox, PenTool, UserPlus,
+  Users, BarChart2, Inbox, PenTool,
   CheckCircle2, Clock, BookOpen, ChevronRight,
   GraduationCap, UserCog
 } from 'lucide-react';
@@ -107,8 +107,7 @@ export default function HodDashboard() {
     }
   }
 
-  async function createFaculty(e) {
-    e.preventDefault();
+  async function handleAddFaculty(form) {
     try {
       const created = { ...facultyForm };
       await addFaculty(facultyForm);
@@ -148,9 +147,7 @@ export default function HodDashboard() {
               { label: 'Approved', value: approved, color: 'bg-emerald-50 text-emerald-600', icon: CheckCircle2 },
             ].map(({ label, value, color, icon: Icon }) => (
               <div key={label} className="flex items-center gap-4 rounded-2xl bg-white p-5 shadow-sm ring-1 ring-slate-200">
-                <div className={`flex h-11 w-11 flex-shrink-0 items-center justify-center rounded-xl ${color}`}>
-                  <Icon size={20} />
-                </div>
+                <div className={`flex h-11 w-11 flex-shrink-0 items-center justify-center rounded-xl ${color}`}><Icon size={20} /></div>
                 <div>
                   <p className="text-2xl font-black text-slate-900">{value}</p>
                   <p className="text-[11px] font-semibold text-slate-500">{label}</p>
@@ -167,9 +164,7 @@ export default function HodDashboard() {
             <div className="rounded-2xl bg-white shadow-sm ring-1 ring-slate-200 overflow-hidden">
               <div className="flex items-center justify-between px-6 py-4 border-b border-slate-100">
                 <h3 className="text-sm font-bold text-slate-900">Awaiting HOD Approval</h3>
-                <button onClick={() => setActiveTab('approvals')} className="flex items-center gap-1 text-xs font-bold text-sky-600 hover:text-sky-700">
-                  View all <ChevronRight size={14} />
-                </button>
+                <button onClick={() => setActiveTab('approvals')} className="flex items-center gap-1 text-xs font-bold text-sky-600 hover:text-sky-700">View all <ChevronRight size={14} /></button>
               </div>
               <ul className="divide-y divide-slate-100">
                 {pendingApprovals.slice(0, 5).map((s) => (
@@ -266,7 +261,7 @@ export default function HodDashboard() {
               <button className="w-full rounded-xl bg-slate-900 py-3 text-sm font-bold text-white hover:bg-slate-800 transition-colors shadow-sm">
                 Add Faculty
               </button>
-            </form>
+            ))}
           </div>
 
           <div className="rounded-2xl bg-white shadow-sm ring-1 ring-slate-200 overflow-hidden flex flex-col">

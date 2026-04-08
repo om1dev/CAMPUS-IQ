@@ -1,12 +1,13 @@
 import { useMemo, useState } from 'react';
 import toast from 'react-hot-toast';
-import { Save } from 'lucide-react';
+import { Save, Send } from 'lucide-react';
 
-export default function DynamicForm({ tableName, tableConfig, onSave }) {
+export default function DynamicForm({ tableName, tableConfig, onSave, onSubmitDirect }) {
   const [title, setTitle] = useState('');
   const [year, setYear] = useState(new Date().getFullYear());
   const [file, setFile] = useState(null);
   const [values, setValues] = useState({});
+  const [submitting, setSubmitting] = useState(false);
 
   const fields = useMemo(() => tableConfig?.fields || [], [tableConfig]);
 
@@ -14,34 +15,45 @@ export default function DynamicForm({ tableName, tableConfig, onSave }) {
     setValues((prev) => ({ ...prev, [name]: value }));
   }
 
-  async function submit(e) {
-    e.preventDefault();
+  function validate() {
+    if (!title.trim()) { toast.error('Title is required'); return false; }
+    const missing = fields.find(f => f.required && !values[f.name]);
+    if (missing) { toast.error(`${missing.label} is required`); return false; }
+    return true;
+  }
 
-    if (!title) {
-      toast.error('Title is required');
-      return;
-    }
-
-    const missingRequired = fields.find((field) => field.required && !values[field.name]);
-    if (missingRequired) {
-      toast.error(`${missingRequired.label} is required`);
-      return;
-    }
-
-    await onSave({
-      title,
-      year,
-      file,
-      data: values
-    });
-
+  function reset() {
     setTitle('');
     setValues({});
     setFile(null);
   }
 
+  async function handleSaveDraft(e) {
+    e.preventDefault();
+    if (!validate()) return;
+    setSubmitting('draft');
+    try {
+      await onSave({ title, year, file, data: values });
+      reset();
+    } finally {
+      setSubmitting(false);
+    }
+  }
+
+  async function handleSubmitDirect(e) {
+    e.preventDefault();
+    if (!validate()) return;
+    setSubmitting('submit');
+    try {
+      await onSubmitDirect({ title, year, file, data: values });
+      reset();
+    } finally {
+      setSubmitting(false);
+    }
+  }
+
   return (
-    <form onSubmit={submit} className="relative overflow-hidden rounded-2xl bg-white p-6 shadow-sm ring-1 ring-slate-200 sm:p-8 animate-slide-up">
+    <form onSubmit={onSubmitDirect ? undefined : handleSaveDraft} className="relative overflow-hidden rounded-2xl bg-white p-6 shadow-sm ring-1 ring-slate-200 sm:p-8 animate-slide-up">
       <div className="absolute top-0 left-0 h-1 w-full bg-slate-800" />
       
       <div className="mb-8 border-b border-slate-100 pb-5">
@@ -116,14 +128,39 @@ export default function DynamicForm({ tableName, tableConfig, onSave }) {
         ))}
       </div>
 
-      <div className="mt-8 flex justify-end border-t border-slate-200 pt-6">
-        <button
-          type="submit"
-          className="inline-flex items-center gap-2 rounded-xl bg-slate-900 px-6 py-2.5 text-sm font-bold text-white shadow-sm transition-all hover:bg-slate-800 hover:shadow-md active:bg-slate-950"
-        >
-          <Save size={16} />
-          Commit Local Draft
-        </button>
+      <div className="mt-8 flex items-center justify-end gap-3 border-t border-slate-200 pt-6">
+        {onSubmitDirect ? (
+          <>
+            <button
+              type="button"
+              disabled={!!submitting}
+              onClick={handleSaveDraft}
+              className="inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-6 py-2.5 text-sm font-bold text-slate-700 shadow-sm transition-all hover:bg-slate-50 active:scale-95 disabled:opacity-50"
+            >
+              <Save size={15} />
+              {submitting === 'draft' ? 'Saving…' : 'Save as Draft'}
+            </button>
+            <button
+              type="button"
+              disabled={!!submitting}
+              onClick={handleSubmitDirect}
+              className="inline-flex items-center gap-2 rounded-xl bg-gradient-to-r from-sky-500 to-indigo-600 px-6 py-2.5 text-sm font-bold text-white shadow-md shadow-sky-500/20 transition-all hover:opacity-90 active:scale-95 disabled:opacity-50"
+            >
+              <Send size={15} />
+              {submitting === 'submit' ? 'Submitting…' : 'Submit'}
+            </button>
+          </>
+        ) : (
+          <button
+            type="button"
+            disabled={!!submitting}
+            onClick={handleSaveDraft}
+            className="inline-flex items-center gap-2 rounded-xl bg-slate-900 px-6 py-2.5 text-sm font-bold text-white shadow-sm transition-all hover:bg-slate-800 hover:shadow-md active:bg-slate-950 disabled:opacity-50"
+          >
+            <Save size={16} />
+            {submitting ? 'Saving…' : 'Save Draft'}
+          </button>
+        )}
       </div>
     </form>
   );
